@@ -1,0 +1,112 @@
+# ============================================================                                                                                                                              
+# .NET (ASP.NET 8 backend + class libraries)
+# Build outputs, package caches, test results.                                                                                                                                              
+# ============================================================
+bin/                                                                                                                                                                                        
+obj/                                                                                                                                                                                        
+*.user                # Per-user Visual Studio / Rider settings
+*.suo                 # VS solution user options                                                                                                                                            
+*.userosscache                                                                                                                                                                              
+*.sln.docstates
+.vs/                  # Visual Studio cache folder                                                                                                                                          
+                
+# NuGet                                                                                                                                                                                     
+*.nupkg         
+*.snupkg
+.nuget/                                                                                                                                                                                     
+packages/             # Old-style packages.config folder (we use PackageReference, but legacy)
+                                                                                                                                                                                            
+# EF Core - migrations themselves ARE committed (they're source code).                                                                                                                      
+# But we ignore the design-time artifacts:                                                                                                                                                  
+*.Designer.cs.bak                                                                                                                                                                           
+                
+# ============================================================                                                                                                                              
+# Test results & coverage (Coverlet + xUnit + Playwright)
+# These are generated on every test run — don't pollute git.                                                                                                                                
+# ============================================================                                                                                                                              
+TestResults/                                                                                                                                                                                
+coverage/                                                                                                                                                                                   
+*.opencover.xml 
+*.cobertura.xml                                                                                                                                                                             
+coverage.json
+coverage.info                                                                                                                                                                               
+test-results/         # Playwright default output dir
+playwright-report/    # Playwright HTML report                                                                                                                                              
+
+# ============================================================                                                                                                                              
+# Node / React frontend (Vite + Tailwind + shadcn/ui)
+# node_modules is the canonical "never commit this" — it's huge                                                                                                                             
+# and reproducible from package.json + lockfile.                                                                                                                                            
+# ============================================================                                                                                                                              
+node_modules/                                                                                                                                                                               
+dist/                 # Vite production build output
+.vite/                # Vite cache                                                                                                                                                          
+*.log
+npm-debug.log*                                                                                                                                                                              
+yarn-debug.log*                                                                                                                                                                             
+yarn-error.log*
+pnpm-debug.log*                                                                                                                                                                             
+                
+# Tailwind / PostCSS caches (rare but possible)                                                                                                                                             
+.tailwind-cache/
+.postcss-cache/                                                                                                                                                                             
+                
+# Note: shadcn/ui components ARE committed — they're "copy-paste into your repo"                                                                                                            
+# by design. That's why there's no shadcn ignore entry here.
+                                                                                                                                                                                            
+# ============================================================
+# Azure Functions (Phase 8 — event-driven)
+# Functions has its own local config that holds secrets.                                                                                                                                    
+# ============================================================
+local.settings.json   # ⚠️  Contains connection strings + keys — NEVER commit                                                                                                                
+.azurefunctions/                                                                                                                                                                            
+                                                                                                                                                                                            
+# ============================================================                                                                                                                              
+# Secrets & local-only config                                                                                                                                                               
+# Anything with real credentials or local-only state.                                                                                                                                       
+# ============================================================                                                                                                                              
+*.env                 # Generic env files                                                                                                                                                   
+.env                                                                                                                                                                                        
+.env.local      
+.env.*.local
+appsettings.Local.json    # Convention: *.Local.json is gitignored, *.Development.json is committed
+secrets.json              # ASP.NET user-secrets — stored outside repo by tooling, but belt + suspenders                                                                                    
+*.pfx                     # Certificates                                                                                                                                                    
+*.key                                                                                                                                                                                       
+                                                                                                                                                                                            
+# ============================================================
+# Load testing & code-quality tooling                                                                                                                                                       
+# k6 result dumps and jscpd duplication reports are large + transient.
+# ============================================================                                                                                                                              
+tests/load/results/
+jscpd-report/                                                                                                                                                                               
+.jscpd/         
+
+# ============================================================
+# OS junk
+# macOS / Windows / Linux file-manager droppings.                                                                                                                                           
+# ============================================================                                                                                                                              
+.DS_Store                                                                                                                                                                                   
+Thumbs.db                                                                                                                                                                                   
+desktop.ini     
+
+# ============================================================
+# IDEs / editors
+# ============================================================                                                                                                                              
+.idea/                # JetBrains Rider / IntelliJ
+.vscode/*             # VS Code — but selectively allow shared settings:                                                                                                                    
+!.vscode/settings.json                                                                                                                                                                      
+!.vscode/launch.json
+!.vscode/tasks.json                                                                                                                                                                         
+!.vscode/extensions.json
+*.swp                 # Vim                                                                                                                                                                 
+*.swo
+*~                    # Emacs backup                                                                                                                                                        
+                                                                                                                                                                                            
+# ============================================================
+# Logs & temp                                                                                                                                                                               
+# ============================================================
+
+logs/
+tmp/
+temp/

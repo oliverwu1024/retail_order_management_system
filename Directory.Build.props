@@ -1,0 +1,87 @@
+<!--            
+Directory.Build.props — root MSBuild defaults for every .csproj in this repo.                                                                                                             
+                
+MSBuild auto-imports this file *before* each project's own .csproj content,                                                                                                               
+by walking up the directory tree until it finds the first Directory.Build.props.                                                                                                          
+No <Import> needed in individual .csproj files.
+                                                                                                                                                                                            
+What this file does:
+    1. Locks .NET 8 LTS as the target framework (matches our locked tech decision).                                                                                                         
+    2. Enables nullable reference types repo-wide (the modern null-safety story).
+    3. Treats warnings as errors — strict mode, "if it builds, it's clean".
+    4. Adds shared analyzer packages so every project gets the same lint rules.                                                                                                             
+    5. Sets common assembly metadata (company, copyright) in one place.                                                                                                                     
+-->                                                                                                                                                                                         
+<Project>                                                                                                                                                                                   
+                                                                                                                                                                                            
+<PropertyGroup Label="Target framework and language">
+    <!-- .NET 8 LTS — supported until Nov 2026. .NET 9 is STS (18 months) — wrong choice for a long-lived project. -->                                                                      
+    <TargetFramework>net8.0</TargetFramework>                                                                                                                                               
+    <!-- 'latest' = the newest C# version the SDK supports. Currently C# 12; bumps automatically with SDK upgrades. -->
+    <LangVersion>latest</LangVersion>                                                                                                                                                       
+</PropertyGroup>
+                                                                                                                                                                                            
+<PropertyGroup Label="Code quality switches">
+    <!--                                                                                                                                                                                    
+    Nullable reference types — the single biggest C# safety improvement of the last decade.
+    'enable' = analysis ON + annotations ON. Compiler now distinguishes 'string' (non-null) from 'string?' (nullable).                                                                    
+    Catches an entire class of NullReferenceException bugs at compile time.                                                                                                               
+    -->                                                                                                                                                                                     
+    <Nullable>enable</Nullable>                                                                                                                                                             
+                                                                                                                                                                                            
+    <!--
+    Use modern C# features (file-scoped namespaces, top-level statements, etc.)                                                                                                           
+    with the implicit using directives the SDK provides.                                                                                                                                  
+    -->
+    <ImplicitUsings>enable</ImplicitUsings>                                                                                                                                                 
+                                                                                                                                                                                            
+    <!--
+    Treat ALL warnings as errors. "If it builds, it's clean."                                                                                                                             
+    This is the strict-mode default for serious projects. Yes, it occasionally annoys you.
+    That annoyance is the feature — it forces you to address things instead of accumulating warning debt.                                                                                 
+    -->                                                                                                                                                                                     
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>                                                                                                                                     
+                                                                                                                                                                                            
+    <!--        
+    Generate XML documentation comments (the /// summary blocks).
+    Required for Swagger to pick up controller/DTO descriptions.                                                                                                                          
+    CS1591 = "Missing XML comment for publicly visible type" — too noisy to enforce, so we silence it.                                                                                    
+    -->                                                                                                                                                                                     
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>                                                                                                                             
+    <NoWarn>$(NoWarn);CS1591</NoWarn>                                                                                                                                                       
+                                                                                                                                                                                            
+    <!--
+    Deterministic builds — same source → byte-identical binary, regardless of machine or timestamp.                                                                                       
+    Required for reproducible CI builds and supply-chain security (so you can verify a binary came from a specific commit).                                                               
+    -->                                                                                                                                                                                     
+    <Deterministic>true</Deterministic>                                                                                                                                                     
+                                                                                                                                                                                            
+    <!--        
+    Enforce code-style rules from .editorconfig during build, not just in the IDE.                                                                                                        
+    Without this, .editorconfig is "IDE hints only" — with it, style violations break the build.                                                                                          
+    -->                                                                                                                                                                                     
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>                                                                                                                                 
+</PropertyGroup>                                                                                                                                                                          
+                
+<PropertyGroup Label="Assembly metadata">                                                                                                                                                 
+    <!-- These flow into every built .dll's metadata (visible in File > Properties on Windows). -->
+    <Company>Retail OMS (self-learn portfolio)</Company>                                                                                                                                    
+    <Product>Retail Order Management System</Product>                                                                                                                                       
+    <Copyright>Copyright © $([System.DateTime]::Now.Year)</Copyright>                                                                                                                       
+    <!-- Neutral language — silences a build warning for satellite assemblies. -->                                                                                                          
+    <NeutralLanguage>en-US</NeutralLanguage>                                                                                                                                                
+</PropertyGroup>
+                                                                                                                                                                                            
+<ItemGroup Label="Shared analyzers (applied to every project)">                                                                                                                           
+    <!--
+    Microsoft's first-party "do the right thing" analyzer pack.                                                                                                                           
+    Adds ~100 rules covering reliability, performance, security, design.                                                                                                                  
+    PrivateAssets=all = don't transitively expose this to downstream consumers
+    (it's a dev-time tool, not a runtime dependency).                                                                                                                                     
+    -->         
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0">                                                                                                        
+    <PrivateAssets>all</PrivateAssets>
+    </PackageReference>                                                                                                                                                                     
+</ItemGroup>  
+                                                                                                                                                                                            
+</Project>      
