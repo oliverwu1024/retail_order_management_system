@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/api/">
+    <Project Path="src/api/Retail.Api/Retail.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/ml/">
+    <Project Path="src/ml/Retail.Ml.Trainer/Retail.Ml.Trainer.csproj" />
+    <Project Path="src/ml/Retail.Ml/Retail.Ml.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Retail.Tests.Integration/Retail.Tests.Integration.csproj" />
+    <Project Path="tests/Retail.Tests.Unit/Retail.Tests.Unit.csproj" />
+  </Folder>
+</Solution>
