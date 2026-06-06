@@ -1,6 +1,12 @@
 # ADR-0001: Target .NET 8 LTS for the Initial Build
 
-**Status**: Accepted (2026-06-06)
+**Status**: Superseded by [ADR-0006](0006-pivot-to-net10-lts.md) (2026-06-06)
+
+> **Note**: This ADR was authored under the incorrect assumption that .NET 10 LTS was not yet GA. .NET 10 LTS in fact GA'd in November 2025 and is the runtime on the host machine. The decision was reversed within hours of being recorded. See ADR-0006 for the current decision and reasoning. The body below is preserved as historical record — do not edit.
+
+---
+
+**Original Status**: Accepted (2026-06-06)
 
 **Deciders**: project owner
 

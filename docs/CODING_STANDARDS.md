@@ -663,7 +663,7 @@ Controller -> Service -> Repository -> DbContext (EF Core)
 - `Include` 链最深 2 层，超过则改用显式 join 或独立查询
 - 写操作：
   - 单实体：`Update()` + `SaveChangesAsync()`
-  - 批量：使用 EF Core 8 的 `ExecuteUpdateAsync()` / `ExecuteDeleteAsync()`
+  - 批量：使用 EF Core 10 的 `ExecuteUpdateAsync()` / `ExecuteDeleteAsync()`
 - 事务：跨多张表的写操作必须使用 `db.Database.BeginTransactionAsync()`
 
 ```csharp

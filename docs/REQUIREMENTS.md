@@ -6,7 +6,7 @@
 
 Figma UI 链接：*待补充 — 项目自主设计；admin 採用自建 Tailwind + shadcn/ui 組件庫*
 
-技术栈：React 18 + Vite + TypeScript + **Tailwind CSS + shadcn/ui (Radix)**（前端）/ ASP.NET Core 8 LTS + EF Core 8 + SQL Server 2022（后端）/ Azure Container Apps + **APIM** + **Service Bus + Event Grid + Functions** + Static Web Apps（部署）
+技术栈：React 18 + Vite + TypeScript + **Tailwind CSS + shadcn/ui (Radix)**（前端）/ ASP.NET Core 10 LTS + EF Core 10 + SQL Server 2022（后端）/ Azure Container Apps + **APIM** + **Service Bus + Event Grid + Functions** + Static Web Apps（部署）
 
 ---
 
@@ -712,7 +712,7 @@ Figma UI 链接：*待补充 — 项目自主设计；admin 採用自建 Tailwin
 - Task 8.1.5 本地 `docker-compose` 加入 Service Bus emulator（或 in-process stub）
 
 #### Story 8.2：Functions 專案
-- Task 8.2.1 創建 `Retail.Functions` 專案（.NET 8 isolated worker）
+- Task 8.2.1 創建 `Retail.Functions` 專案（.NET 10 isolated worker）
 - Task 8.2.2 `StripeWebhookHandlerFn`（HTTP trigger）— 簽名驗證 + 冪等檢查 → publish 到 Event Grid
 - Task 8.2.3 `OrderConfirmationFn`（Service Bus trigger，queue=`orders-confirmation`）— 提交 reservation、創建 Order
 - Task 8.2.4 `VoucherRedemptionFn`（Service Bus trigger，queue=`vouchers-redemption`）— 寫 `VoucherRedemption`、扣 `UsesRemaining`

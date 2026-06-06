@@ -20,7 +20,7 @@ indent_style             = space         # Spaces > tabs for cross-tool consiste
 indent_size              = 4             # Default; overridden per language below.                                                                                                          
                                                                                                                                                                                             
 # ============================================================                                                                                                                              
-# C# (.cs) — ASP.NET 8 backend                                                                                                                                                              
+# C# (.cs) — ASP.NET 10 backend                                                                                                                                                              
 # 4-space indent is the .NET community convention (Microsoft docs, dotnet/runtime repo).                                                                                                    
 # ============================================================                                                                                                                              
 [*.cs]                                                                                                                                                                                      

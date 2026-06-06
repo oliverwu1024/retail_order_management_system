@@ -6,7 +6,7 @@ by walking up the directory tree until it finds the first Directory.Build.props.
 No <Import> needed in individual .csproj files.
                                                                                                                                                                                             
 What this file does:
-    1. Locks .NET 8 LTS as the target framework (matches our locked tech decision).                                                                                                         
+    1. Locks .NET 10 LTS as the target framework (matches our locked tech decision; see ADR-0006).                                                                                                         
     2. Enables nullable reference types repo-wide (the modern null-safety story).
     3. Treats warnings as errors — strict mode, "if it builds, it's clean".
     4. Adds shared analyzer packages so every project gets the same lint rules.                                                                                                             
@@ -15,9 +15,9 @@ What this file does:
 <Project>                                                                                                                                                                                   
                                                                                                                                                                                             
 <PropertyGroup Label="Target framework and language">
-    <!-- .NET 8 LTS — supported until Nov 2026. .NET 9 is STS (18 months) — wrong choice for a long-lived project. -->                                                                      
-    <TargetFramework>net8.0</TargetFramework>                                                                                                                                               
-    <!-- 'latest' = the newest C# version the SDK supports. Currently C# 12; bumps automatically with SDK upgrades. -->
+    <!-- .NET 10 LTS — GA Nov 2025, supported through Nov 2028. Flipped from net8.0 on 2026-06-06 — see ADR-0006 (supersedes ADR-0001). -->
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- 'latest' = the newest C# version the SDK supports. Currently C# 14; bumps automatically with SDK upgrades. -->
     <LangVersion>latest</LangVersion>                                                                                                                                                       
 </PropertyGroup>
                                                                                                                                                                                             
@@ -79,7 +79,7 @@ What this file does:
     PrivateAssets=all = don't transitively expose this to downstream consumers
     (it's a dev-time tool, not a runtime dependency).                                                                                                                                     
     -->         
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0">                                                                                                        
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.100">                                                                                                        
     <PrivateAssets>all</PrivateAssets>
     </PackageReference>                                                                                                                                                                     
 </ItemGroup>  

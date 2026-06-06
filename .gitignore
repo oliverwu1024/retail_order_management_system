@@ -1,5 +1,5 @@
 # ============================================================                                                                                                                              
-# .NET (ASP.NET 8 backend + class libraries)
+# .NET (ASP.NET 10 backend + class libraries)
 # Build outputs, package caches, test results.                                                                                                                                              
 # ============================================================
 bin/                                                                                                                                                                                        

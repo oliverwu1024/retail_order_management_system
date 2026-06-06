@@ -16,7 +16,7 @@ Success = deployed to Azure with a public URL, four AI surfaces visibly working,
 |---|---|
 | Frontend | React 18 + Vite + TypeScript (single app: storefront + `/admin` route) |
 | Styling | **Tailwind CSS + shadcn/ui (Radix-based headless)** — hand-built `components/ui/` library. *Flipped 2026-06-06 from Refine.dev + MUI v5 to match Job B "Tailwind CSS" bullet.* |
-| Backend | ASP.NET Core 8 LTS (clean bump to .NET 10 LTS post Nov 2026) |
+| Backend | ASP.NET Core 10 LTS (GA Nov 2025; support through Nov 2028). *Flipped from net8.0 on 2026-06-06 — see ADR-0006.* |
 | API style | **MVC Controllers** with `[ApiController]` + attribute routing |
 | Architecture | **Three-tier** in single `Retail.Api` project (Controllers → Services → Repositories → DbContext) |
 | Auth | ASP.NET Core Identity + **JWT access token in HTTP-only / Secure / SameSite=Strict cookie + refresh-token rotation + CSRF double-submit token**. *Upgraded 2026-06-06 from localStorage.* Roles: `Customer`, `StoreManager`, `Staff`, `Administrator` |
@@ -51,7 +51,7 @@ Success = deployed to Azure with a public URL, four AI surfaces visibly working,
 +-------------------+    HTTPS    +--------------------+    +---------------------------------------+
 | Browser           | <---------> |  Azure API         | -> |  Azure Container Apps                 |
 |  - Storefront     |  HTTP-only  |  Management (APIM) |    |  --------------------                 |
-|    + chat drawer  |  cookie     |  (rate limit,      |    |  ASP.NET Core 8 LTS Web API           |
+|    + chat drawer  |  cookie     |  (rate limit,      |    |  ASP.NET Core 10 LTS Web API          |
 |  - Admin (/admin) |  + CSRF     |   JWT validate,    |    |   - Catalog / Cart / Orders / Vouchers|
 |  React 18 + Vite  |             |   OpenAPI docs)    |    |   - Loyalty / Pricing pipeline        |
 |  Tailwind + shadcn|             +--------------------+    |   - Auth (Identity + JWT-in-cookie)   |
@@ -132,7 +132,7 @@ Backend uses **three-tier architecture** in a single API project: `Controllers/`
 ```
 retail_order_management_system/
   src/
-    api/                              # ASP.NET Core 8 LTS solution (three-tier)
+    api/                              # ASP.NET Core 10 LTS solution (three-tier)
       Retail.Api/                     # Single API project — Controllers/Services/Repositories/Domain/Data
       Retail.Functions/               # Azure Functions (Stripe webhook, Event Grid subscribers, scheduled jobs)
       Retail.Ml/                      # ML.NET training + prediction services
@@ -231,9 +231,9 @@ Monorepo over polyrepo: one PR can change contract + client + IaC together; CI r
 ## 5. Tech Stack Specifics
 
 **Backend**
-- **.NET 8 LTS** — supported through Nov 2026. .NET 10 LTS bump planned post Nov 2026.
-- **EF Core 8** (SQL Server provider). Migrations in `Retail.Api/Data/Migrations/`.
-- **ASP.NET Core Identity 8** + **JWT bearer**. Access token issued into **HTTP-only / Secure / SameSite=Strict cookie**; refresh token rotated on every refresh; CSRF double-submit token on state-changing endpoints. ADR-0007 explains the choice over localStorage.
+- **.NET 10 LTS** — GA Nov 2025, supported through Nov 2028. *Flipped from .NET 8 LTS on 2026-06-06 — see ADR-0006.*
+- **EF Core 10** (SQL Server provider). Migrations in `Retail.Api/Data/Migrations/`.
+- **ASP.NET Core Identity 10** + **JWT bearer**. Access token issued into **HTTP-only / Secure / SameSite=Strict cookie**; refresh token rotated on every refresh; CSRF double-submit token on state-changing endpoints. ADR-0007 explains the choice over localStorage.
 - **API style**: MVC Controllers with `[ApiController]` + attribute routing.
 - **Architecture**: classic three-tier — Controller → Service → Repository → DbContext. Service is the only layer that may start multi-table transactions and call external clients.
 - **FluentValidation 11** auto-wired.
@@ -633,7 +633,7 @@ Per-phase manual smoke listed in each phase above. `make verify` script per phas
 | 1 | Scope | Realistic small-business MVP + Promotions + Event-driven + Observability + Perf (all 10 phases). Driven by 2 resume role entries. |
 | 2 | Timeline | ~31–40 weeks (~7–9 months). Explicitly accepted 2026-06-06. |
 | 3 | Chatbot UI | Custom React Tailwind drawer (Phase 5); Copilot Studio Phase 6 stretch |
-| 4 | .NET version | .NET 8 LTS now; bump to .NET 10 LTS post Nov 2026 |
+| 4 | .NET version | .NET 10 LTS (GA Nov 2025; support through Nov 2028) — flipped from .NET 8 on 2026-06-06, see ADR-0006 |
 | 5 | Azure region | Australia East (Sydney) |
 | 6 | Styling / admin | **React + Tailwind CSS + shadcn/ui (Radix headless)** — flipped from Refine.dev + MUI v5 on 2026-06-06 |
 | 7 | Auth | ASP.NET Core Identity + JWT issued as **HTTP-only cookie + refresh-token rotation + CSRF**; 4 roles (Customer / StoreManager / Staff / Administrator) |

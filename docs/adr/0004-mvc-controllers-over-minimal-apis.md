@@ -10,7 +10,7 @@
 
 ## Context
 
-ASP.NET Core 8 offers two HTTP API authoring styles:
+ASP.NET Core 10 offers two HTTP API authoring styles:
 
 - **MVC Controllers** — class-per-domain action containers, attribute routing (`[Route]`, `[HttpGet]`), rich filter pipeline (`IActionFilter`, `IAsyncResultFilter`, etc.), model binding, action conventions, and the `[ApiController]` attribute that adds automatic 400 model validation and `ProblemDetails` responses.
 - **Minimal APIs** — endpoint-as-lambda registered against `WebApplication` (`app.MapPost("/orders", ...)`). Lower ceremony per endpoint, slightly better cold-start and throughput, AOT-friendly. Introduced in .NET 6.
@@ -41,7 +41,7 @@ Azure Functions are out of scope of this decision — they have their own progra
 - **`[ApiController]` gives sensible defaults for free**: automatic 400 on invalid models, automatic binding-source inference (`[FromBody]` for complex types, `[FromRoute]` for path tokens), `ProblemDetails` errors with `traceId`.
 - **Controllers are a natural composition root for three-tier.** A `OrdersController` lines up with `IOrderService` and stays thin (input shaping → service call → response shaping).
 - **Convention support for OpenAPI / Swashbuckle is mature** — XML doc comments, `[ProducesResponseType]`, and `[FromBody]`/`[FromQuery]` flow into Swagger without bespoke filter writing.
-- **Tutorial / StackOverflow / book corpus is dominated by Controllers.** For a learning project, debugging help is one search away. Resume narrative — *"ASP.NET 8 MVC with three-tier separation"* — is the industry-default phrasing.
+- **Tutorial / StackOverflow / book corpus is dominated by Controllers.** For a learning project, debugging help is one search away. Resume narrative — *"ASP.NET 10 MVC with three-tier separation"* — is the industry-default phrasing.
 - **Easier organization at 20+ endpoints.** A single `Program.cs` `app.MapPost(...)` chain becomes hard to scan and review; class-per-domain controllers stay structured.
 
 **Negative / trade-offs**

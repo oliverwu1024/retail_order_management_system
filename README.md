@@ -1,6 +1,6 @@
 # Retail Order Management System                                                                                                                                                            
                                                                                                                                                                                             
-A full-stack e-commerce + order management platform built as a deep-dive portfolio project covering modern backend (ASP.NET 8), frontend (React + Tailwind + shadcn/ui), cloud (Azure),     
+A full-stack e-commerce + order management platform built as a deep-dive portfolio project covering modern backend (ASP.NET 10 LTS), frontend (React + Tailwind + shadcn/ui), cloud (Azure),     
 event-driven architecture (Service Bus + Event Grid), and applied ML/AI (recommendation, demand forecasting, fraud scoring, multi-provider LLM customer support).                           
                                                                                                                                                                                             
 > **Status:** 🚧 In active development. Phase 0 (project scaffolding) in progress. See [`docs/PLAN.md`](docs/PLAN.md) for the full 11-phase roadmap.                                        
@@ -19,7 +19,7 @@ point. The goal is *depth over breadth*: real Azure deployment, real event-drive
 ## Tech stack                                                                                                                                                                               
 
 **Backend**                                                                                                                                                                                 
-- ASP.NET Core 8 (LTS), MVC Controllers, Entity Framework Core 8
+- ASP.NET Core 10 (LTS), MVC Controllers, Entity Framework Core 10
 - SQL Server (Azure SQL Serverless in production)                                                                                                                                           
 - ASP.NET Identity + JWT in HTTP-only cookies + refresh-token rotation
 - Stripe (test mode) for payments                                                                                                                                                           
@@ -48,7 +48,7 @@ point. The goal is *depth over breadth*: real Azure deployment, real event-drive
                                                                                                                                                                                         
 ## Quick start  
 
-> **Prereqs:** .NET 8 SDK, Node 20+, Docker (for local SQL Server), Git.                                                                                                                    
+> **Prereqs:** .NET 10 SDK, Node 20+, Docker (for local SQL Server), Git.                                                                                                                    
 
 ```bash                                                                                                                                                                                     
 # 1. Clone & restore
@@ -82,7 +82,7 @@ Once running, open `http://localhost:5173` and sign in with the seeded admin acc
         └────────┬────────┘                                                                                                                                                           
                     │
         ┌──────────▼──────────┐                                                                                                                                                         
-        │   Container Apps    │  (ASP.NET 8 API)
+        │   Container Apps    │  (ASP.NET 10 API)
         │   - Identity        │                                                                                                                                                         
         │   - Catalog         │
         │   - Orders          │                                                                                                                                                         
