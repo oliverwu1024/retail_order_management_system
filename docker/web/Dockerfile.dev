@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Dev-mode Dockerfile for the React SPA.
+#
+#  WHY A "dev" DOCKERFILE AT ALL?
+#  ------------------------------
+#  In production we deploy to Azure Static Web Apps — no container needed.
+#  This image exists so the docker-compose-up workflow can spin up the WHOLE
+#  stack (api + sql + azurite + web) without a host-side `pnpm dev` step.
+#  Useful for parity testing and onboarding new contributors.
+#
+#  WHY corepack INSTEAD OF `npm i -g pnpm`?
+#  ----------------------------------------
+#  corepack ships with Node 16+ and bootstraps the EXACT pnpm version
+#  declared in package.json's "packageManager" field (if present), or the
+#  latest stable. Avoids "works on my machine" drift between hosts that
+#  globally installed different pnpm majors.
+#
+#  WHY THE NAMED VOLUME FOR node_modules?
+#  --------------------------------------
+#  docker-compose mounts the host's src/web/ over /app for live-reload.
+#  Without protecting /app/node_modules with an anonymous volume, the host's
+#  empty/absent node_modules would shadow the container's installed deps and
+#  vite would 404 on every import. The compose file declares that volume;
+#  this Dockerfile just creates the deps so it has something to populate
+#  the volume from.
+# ─────────────────────────────────────────────────────────────────────────────
+
+FROM node:20-alpine
+
+# Enable corepack (pnpm-via-corepack works without a global npm install).
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy lockfile + manifest first so install is cacheable separately from
+# source edits. Same layer-caching trick as the backend Dockerfile.
+COPY src/web/package.json src/web/pnpm-lock.yaml ./
+
+# --frozen-lockfile fails fast if pnpm-lock.yaml is out of sync with
+# package.json — guards against "works on dev's machine but the lockfile
+# wasn't committed" drift.
+RUN pnpm install --frozen-lockfile
+
+# Source comes in via the compose volume mount at runtime — no COPY here.
+
+# Vite default dev-server port.
+EXPOSE 5173
+
+# --host 0.0.0.0 lets vite accept connections from outside the container
+# (Docker Desktop maps localhost → the container's loopback by default).
+# Without this flag, vite binds to 127.0.0.1 INSIDE the container and the
+# port mapping appears dead from the host.
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
