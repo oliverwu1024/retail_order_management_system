@@ -1,0 +1,25 @@
+{
+  "$schema": "https://node-modules.io/jscpd/jscpd-schema.json",
+  "threshold": 10,
+  "min-lines": 5,
+  "min-tokens": 50,
+  "format": ["typescript", "tsx", "csharp"],
+  "pattern": "**/*.{ts,tsx,cs}",
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/*.d.ts",
+    "**/Migrations/**",
+    "**/Data/Migrations/**",
+    "**/docs/**"
+  ],
+  "absolute": true,
+  "gitignore": true,
+  "reporters": ["console", "markdown"],
+  "output": "../../docs/perf/jscpd-baseline-report"
+}
