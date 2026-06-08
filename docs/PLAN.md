@@ -249,10 +249,10 @@ Monorepo over polyrepo: one PR can change contract + client + IaC together; CI r
 - **OpenAPI**: `Swashbuckle.AspNetCore` (Swagger UI in non-prod, exported as OpenAPI 3.0 to APIM in prod).
 
 **Frontend**
-- **React 18.3 + Vite 5 + TypeScript 5.6**.
-- **Tailwind CSS 3.4** + **shadcn/ui** (Radix-based headless components, copied into repo at `components/ui/`).
-- **TanStack Query v5** + **Zustand 4**.
-- **React Router v6.4+ data router**.
+- **React 19.2 + Vite 8 + TypeScript 6.0**. *Bumped from React 18.3 / Vite 5 / TS 5.6 on 2026-06-08 — see ADR-0010.*
+- **Tailwind CSS 3.4** + **shadcn/ui** (Radix-based headless components, copied into repo at `components/ui/`). *Tailwind pinned at 3.x intentionally; 4.x migration is a separate decision.*
+- **TanStack Query v5** + **Zustand 5**.
+- **React Router v7 data router**.
 - **Forms**: React Hook Form + Zod.
 - **API client**: `openapi-typescript` + `openapi-fetch` from OpenAPI doc. CSRF token attached to every state-changing request from a non-HTTP-only cookie.
 - **Charts**: Recharts (replaces MUI X Charts).
