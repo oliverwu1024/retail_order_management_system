@@ -1,0 +1,54 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  .dockerignore — controls what gets sent to the Docker daemon as build
+#  context. Keep this LEAN: every excluded folder = fewer bytes copied,
+#  faster `docker build`, no chance of stale build artifacts getting baked
+#  into a layer.
+#
+#  Mirror the .gitignore where it makes sense; add Docker-specific bits.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# .NET build outputs — must NEVER be sent to the daemon; they break
+# multi-arch builds and bake host-specific binaries into the image.
+**/bin/
+**/obj/
+**/TestResults/
+**/coverage/
+
+# Node — sending node_modules can be 200+ MB of pure waste.
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+
+# Git / IDE / OS noise
+.git/
+.gitignore
+.gitattributes
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Docker artifacts themselves
+docker/
+.dockerignore
+Dockerfile*
+
+# Docs and ADRs aren't part of the runtime image
+docs/
+README.md
+LICENSE
+*.md
+
+# Secrets — defensive (none should be checked in, but if a local
+# .env exists we never want it landing in an image layer).
+.env
+.env.local
+**/secrets.json
+**/appsettings.*.Production.json
+
+# User-secrets manifest (the secrets themselves live outside the repo)
+**/UserSecretsId
