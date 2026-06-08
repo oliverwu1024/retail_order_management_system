@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\..\ml\Retail.Ml\Retail.Ml.csproj" />
@@ -30,6 +30,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>d8a076ad-a15e-4ae2-bc9e-f85e86921055</UserSecretsId>
   </PropertyGroup>
 
 </Project>
