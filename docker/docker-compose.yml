@@ -2,11 +2,11 @@
 #  Local development stack: api + web + sqlserver + azurite.
 #
 #  Invocation (from repo root):
-#    docker compose -f docker/docker-compose.yml --env-file .env up -d --build
+#    docker compose -f docker/docker-compose.yml up -d --build
 #
-#  The --env-file flag is REQUIRED because .env lives at repo root, not next
-#  to this compose file. Without it, MSSQL_SA_PASSWORD etc. default to empty
-#  strings and SQL Server refuses to boot ("password didn't meet complexity").
+#  No --env-file flag needed: .env lives next to this compose file (docker/.env),
+#  which is compose v2's default discovery location. cp docker/.env.example
+#  docker/.env before first run.
 #
 #  WHY THIS LIVES UNDER docker/ INSTEAD OF AT REPO ROOT
 #  ---------------------------------------------------
@@ -41,12 +41,6 @@ services:
       - '1433:1433'
     volumes:
       - mssql-data:/var/opt/mssql
-      # Optional bootstrap script — run manually after first boot:
-      #   docker compose exec sqlserver /opt/mssql-tools18/bin/sqlcmd \
-      #     -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -i /init/init.sql
-      # We do NOT auto-run it; EF migrations are the source of truth for
-      # schema, and auto-running init.sql races with EF's own DB creation.
-      - ./sql:/init:ro
     healthcheck:
       # Use sqlcmd from the 2022 image's mssql-tools18 path. -C trusts the
       # self-signed cert; -No disables strict encryption. exit 1 on any
@@ -132,10 +126,11 @@ services:
       start_period: 20s
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Web (Vite dev server) — OPTIONAL in compose.
-  # Most frontend devs prefer `cd src/web && pnpm dev` on the host (faster
-  # HMR, no volume-mount quirks). This service is here so a full `compose
-  # up` is enough for an onboarding demo or e2e parity check.
+  # Web (Vite dev server) — OPTIONAL. Prefer `cd src/web && pnpm dev` on the
+  # host for actual frontend dev (faster HMR, no volume-mount quirks). This
+  # service exists for full-stack onboarding demos and e2e parity checks.
+  # Skip it with: `docker compose -f docker/docker-compose.yml up -d
+  # sqlserver azurite api` — names the services to start, web is excluded.
   # ───────────────────────────────────────────────────────────────────────────
   web:
     build:

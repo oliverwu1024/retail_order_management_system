@@ -26,10 +26,11 @@ point. The goal is *depth over breadth*: real Azure deployment, real event-drive
 - ML.NET for recommendations, demand forecasting, fraud scoring
 - Multi-provider LLM (OpenAI + Anthropic) for customer-support chat                                                                                                                         
                                                                                                                                                                                         
-**Frontend**                                                                                                                                                                                
-- React 18 + TypeScript + Vite                                                                                                                                                              
-- Tailwind CSS + shadcn/ui
-- TanStack Query for server state
+**Frontend**
+- React 19 + TypeScript 6 + Vite 8 *(see ADR-0010)*
+- Tailwind CSS 3.4 + shadcn/ui (Radix-based, hand-written primitives)
+- TanStack Query for server state + Zustand 5 for client state
+- React Router v7 (data router)
 - Playwright for E2E tests
                                                                                                                                                                                         
 **Cloud (Azure)**
@@ -46,23 +47,57 @@ point. The goal is *depth over breadth*: real Azure deployment, real event-drive
                                                                                                                                                                                         
 ---                                                                                                                                                                                         
                                                                                                                                                                                         
-## Quick start  
+## Quick start
 
-> **Prereqs:** .NET 10 SDK, Node 20+, Docker (for local SQL Server), Git.                                                                                                                    
+> **Prereqs:** Docker Desktop (or Engine + Compose v2), .NET 10 SDK, Node 20+, Git.
 
-```bash                                                                                                                                                                                     
-# 1. Clone & restore
-git clone <repo-url> && cd retail-order-management-system
-                                                                                                                                                                                        
-# 2. Start local infrastructure (SQL Server in Docker)
-docker compose up -d                                                                                                                                                                        
-            
-# 3. Run backend + frontend (two terminals)
-dotnet run --project src/api/RetailOms.Api    # http://localhost:5000                                                                                                                       
-cd src/web && npm install && npm run dev      # http://localhost:5173                                                                                                                       
-```                                                                                                                                                                                         
-                                                                                                                                                                                        
-Once running, open `http://localhost:5173` and sign in with the seeded admin account (see [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md#seeded-users)).                                     
+Three commands to a running stack:
+
+```bash
+# 1. Copy the env template (.env lives next to the compose file so no --env-file flag is needed)
+cp docker/.env.example docker/.env
+
+# 2. Build images + start api + web + sqlserver + azurite
+docker compose -f docker/docker-compose.yml up -d --build
+
+# 3. Apply EF Core migrations against the containerized SQL Server
+#    (first-time only; re-run after any new migration)
+dotnet ef database update --project src/api/Retail.Api
+```
+
+After that, services are reachable at:
+
+| URL                                       | What                                  |
+|-------------------------------------------|----------------------------------------|
+| <http://localhost:5173>                   | Web UI (Vite dev server, HMR-enabled)  |
+| <http://localhost:5124/swagger>           | API + Swagger UI                       |
+| <http://localhost:5124/api/health>        | App-envelope heartbeat                 |
+| <http://localhost:5124/health/live>       | Liveness probe (no DB)                 |
+| <http://localhost:5124/health/ready>      | Readiness probe (includes DB check)    |
+| `localhost:1433`                          | SQL Server (sa / `$MSSQL_SA_PASSWORD`) |
+| `localhost:10000-10002`                   | Azurite (blob / queue / table)         |
+
+To stop the stack: `docker compose -f docker/docker-compose.yml down`.
+To wipe persistent data too: add `-v` (drops SQL data and Azurite blobs).
+
+### Running pieces directly (without containers)
+
+The `web` service in compose is convenient for full-stack demos, but for actual frontend work, run Vite on the host — HMR is faster and you skip the anonymous-volume `node_modules` quirks:
+
+```bash
+# Start only the backing infra in containers; skip the web service
+docker compose -f docker/docker-compose.yml up -d sqlserver azurite api
+
+# Run Vite on the host
+cd src/web && pnpm install && pnpm dev
+```
+
+For the API on the host (uses `dotnet user-secrets` for `Jwt:Key`, not the env file):
+
+```bash
+docker compose -f docker/docker-compose.yml up -d sqlserver azurite
+dotnet run --project src/api/Retail.Api
+```                                     
                                                                                                                                                                                         
 ---                                                                                                                                                                                         
             
@@ -112,7 +147,7 @@ Full architecture, ADRs, and per-phase design notes live in [`docs/`](docs/).
 | [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) | Epic / Story / Task breakdown + acceptance criteria |                                                                                    
 | [`docs/DATABASE_DESIGN.md`](docs/DATABASE_DESIGN.md) | Schema, indexes, migration strategy |                                                                                              
 | [`docs/CODING_STANDARDS.md`](docs/CODING_STANDARDS.md) | Conventions, definition-of-done, review checklist |                                                                              
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records (ADRs 0001–0005) |                                                                                                               
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records (ADRs 0001–0006, 0010) |                                                                                                               
                                                                                                                                                                                         
 ---                                                                                                                                                                                         
                                                                                                                                                                                         
