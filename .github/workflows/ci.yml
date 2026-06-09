@@ -1,0 +1,170 @@
+name: CI
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Continuous integration — runs on every PR + every push to main.
+#
+#  Three parallel jobs: api (dotnet build + test), web (typecheck + lint +
+#  format + build), bicep (compile-as-syntax-check). All must pass for the
+#  PR to merge — wired into branch protection in the GitHub repo settings.
+#
+#  WHY THREE PARALLEL JOBS INSTEAD OF ONE SCRIPT?
+#  ----------------------------------------------
+#  Parallel = faster: api + web + bicep all run on dedicated runners
+#  simultaneously. Also: each job's failure is independently reportable —
+#  the GitHub UI shows "api ❌ web ✅ bicep ✅" instead of "CI failed"
+#  with a wall of logs.
+#
+#  WHY NO DEPLOY STEPS?
+#  --------------------
+#  Deployments live in cd-staging.yml / cd-prod.yml (Phase 11). ci.yml is
+#  build + test only — runs on every PR including from forks, where it
+#  would be a security hole to expose deployment credentials.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel stale runs when new commits land on a PR — saves CI minutes and
+# stops the "wait for the old failed run to finish first" cycle.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Backend · ASP.NET Core API
+  # ───────────────────────────────────────────────────────────────────────────
+  api:
+    name: API · build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # NuGet cache speeds up restores from ~30s to ~3s on warm runs.
+      # The cache key includes every csproj hash so a dependency change
+      # busts the cache cleanly.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        # No tests exist yet (test projects are empty xUnit scaffolds).
+        # `dotnet test` exits 0 in that case, so this is a passing no-op
+        # today and a real gate the moment we write the first test.
+        run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        # Always upload, even on failure, so the .trx is available for
+        # post-mortem in the GitHub Actions UI.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Frontend · Vite + React SPA
+  # ───────────────────────────────────────────────────────────────────────────
+  web:
+    name: Web · typecheck + lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        # pnpm/action-setup installs the version pinned in package.json's
+        # `packageManager` field (or a fallback). Setting up pnpm BEFORE
+        # setup-node lets setup-node's cache-key resolution find the
+        # right store path.
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+          cache-dependency-path: src/web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Build
+        run: pnpm build
+
+      # No `pnpm test` yet — Vitest tests land in Phase 1+. Add the step
+      # the moment we write the first test.
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Infrastructure · Bicep syntax check
+  # ───────────────────────────────────────────────────────────────────────────
+  bicep:
+    name: Bicep · build (syntax check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # `az` is preinstalled on ubuntu-latest; `az bicep install` is
+      # idempotent + fast (downloads the bicep CLI into the az cache).
+      - name: Install Bicep
+        run: az bicep install
+
+      # `bicep build` compiles to ARM JSON. Any syntax error, missing
+      # parameter, or type mismatch surfaces as a non-zero exit. We don't
+      # care about the ARM output (discarded); only the exit code.
+      - name: Compile main.bicep
+        run: |
+          mkdir -p /tmp/bicep-out
+          az bicep build --file infra/bicep/main.bicep --outdir /tmp/bicep-out
+
+      - name: Compile each module
+        # Today's main.bicep has every module reference commented out, so
+        # `bicep build main.bicep` doesn't transitively check the modules.
+        # We compile each module file individually to catch typos. The
+        # `no-unused-params` lint rule is downgraded to Info in
+        # infra/bicep/bicepconfig.json so placeholder modules don't spam
+        # CI; real errors still fail the build.
+        run: |
+          for m in infra/bicep/modules/*.bicep; do
+            echo "Compiling $m"
+            az bicep build --file "$m" --outdir /tmp/bicep-out
+          done
+
+      - name: Compile bicepparam files
+        run: |
+          for paramfile in infra/bicep/env/*.bicepparam; do
+            echo "Compiling $paramfile"
+            az bicep build-params --file "$paramfile" --outfile "/tmp/bicep-out/$(basename "$paramfile" .bicepparam).parameters.json"
+          done
