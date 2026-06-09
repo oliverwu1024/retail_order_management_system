@@ -1,0 +1,14 @@
+{
+  "$schema": "https://aka.ms/bicep/config-schema.json",
+  "analyzers": {
+    "core": {
+      "verbose": false,
+      "enabled": true,
+      "rules": {
+        "no-unused-params": {
+          "level": "info"
+        }
+      }
+    }
+  }
+}

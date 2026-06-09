@@ -433,7 +433,7 @@ Figma UI 链接：*待补充 — 项目自主设计；admin 採用自建 Tailwin
 
 #### Story 0.5：CI/CD 与 IaC
 - Task 0.5.1 GitHub Actions `ci.yml`（api 构建测试、web typecheck lint test、bicep lint）
-- Task 0.5.2 Bicep 骨架：`main.bicep` + 8 个 module 占位
+- Task 0.5.2 Bicep 骨架：`main.bicep` + 12 个 module 占位（apim、containerApps、sql、keyVault、storage、ai、monitoring、registry、staticWebApp、serviceBus、eventGrid、functions — 与 PLAN.md §4 保持一致；2026-06-08 修正：原写 8 个，未反映事件驱动架构 pivot 新增的 4 个模块）
 - Task 0.5.3 `iac.yml` 工作流（`bicep build` + `bicep what-if`）
 
 ---
