@@ -1,0 +1,119 @@
+name: Infrastructure
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Bicep IaC workflow.
+#
+#  Two jobs:
+#    1. `build` — `bicep build` + `bicep build-params`. Runs on every PR
+#       touching infra/ AND on every push to main AND on manual dispatch.
+#       Pure syntax check; no Azure auth required. Stays GREEN until we
+#       introduce an actual syntax error.
+#
+#    2. `what-if` — `az deployment sub what-if` against a real subscription.
+#       Gated behind `workflow_dispatch` ONLY so PRs don't go red while
+#       the federated credential isn't set up. Activate by manually
+#       triggering from the Actions tab and choosing env=dev or env=prod.
+#
+#  OIDC AUTH (when what-if is invoked):
+#  ----------------------------------
+#  Requires three repo secrets:
+#    - AZURE_CLIENT_ID       (service principal client id)
+#    - AZURE_TENANT_ID       (your AAD tenant)
+#    - AZURE_SUBSCRIPTION_ID (target subscription)
+#  Plus a federated credential on the SP that trusts this repo's
+#  workflow runs (no client secret — that's the OIDC win).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths: ['infra/bicep/**', '.github/workflows/iac.yml']
+  pull_request:
+    branches: [main]
+    paths: ['infra/bicep/**', '.github/workflows/iac.yml']
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Target environment for what-if'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: iac-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  # id-token is required for the azure/login@v2 OIDC handshake. contents:read
+  # is the standard checkout permission. Nothing else is granted — least
+  # privilege for the workflow itself.
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Bicep · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep
+        run: az bicep install
+
+      - name: Compile main.bicep
+        run: |
+          mkdir -p /tmp/bicep-out
+          az bicep build --file infra/bicep/main.bicep --outdir /tmp/bicep-out
+
+      - name: Compile each module
+        run: |
+          for m in infra/bicep/modules/*.bicep; do
+            echo "Compiling $m"
+            az bicep build --file "$m" --outdir /tmp/bicep-out
+          done
+
+      - name: Compile bicepparam files
+        run: |
+          for paramfile in infra/bicep/env/*.bicepparam; do
+            echo "Compiling $paramfile"
+            az bicep build-params --file "$paramfile" \
+              --outfile "/tmp/bicep-out/$(basename "$paramfile" .bicepparam).parameters.json"
+          done
+
+      - name: Upload compiled ARM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bicep-arm-output
+          path: /tmp/bicep-out/
+          if-no-files-found: warn
+
+  what-if:
+    name: Bicep · what-if (preview)
+    runs-on: ubuntu-latest
+    needs: build
+    # Gate: only run when manually dispatched, never on PR/push. This keeps
+    # PRs from going red while Azure OIDC isn't wired up yet, and avoids
+    # leaking deployment intent on every commit.
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Bicep
+        run: az bicep install
+
+      - name: Run what-if
+        run: |
+          az deployment sub what-if \
+            --location australiaeast \
+            --template-file infra/bicep/main.bicep \
+            --parameters "infra/bicep/env/${{ inputs.target_env }}.bicepparam"
