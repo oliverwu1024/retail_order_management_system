@@ -73,10 +73,12 @@ EXPOSE 8080
 # build stage).
 COPY --from=build --chown=app:app /app/publish .
 
-# Healthcheck inside the container so Docker (and downstream services)
-# know when we're actually ready. Hits the liveness endpoint we wired
-# up in Story 0.2 — no DB dependency, no auth.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget -q --spider http://localhost:8080/health/live || exit 1
+# No Docker HEALTHCHECK — by design, not an omission. This image runs under
+# Azure Container Apps, which performs its own HTTP liveness/readiness probes
+# (defined in Bicep) and IGNORES the Dockerfile HEALTHCHECK entirely — as do
+# Kubernetes and most orchestrators. The minimal aspnet runtime image also
+# ships no wget/curl, so a shell-based probe can't run here without bloating
+# the image + attack surface. Health is owned by the orchestrator (prod) and by
+# compose depends_on + the /health/* endpoints (local). See ADR-0011.
 
 ENTRYPOINT ["dotnet", "Retail.Api.dll"]

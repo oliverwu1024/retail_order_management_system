@@ -115,15 +115,10 @@ services:
       Jwt__Key: ${JWT_KEY}
     ports:
       - '5124:8080'
-    healthcheck:
-      # Mirrors the HEALTHCHECK in the Dockerfile but compose uses its own
-      # — duplication is fine; compose's check drives `depends_on`
-      # conditions for downstream services.
-      test: ['CMD-SHELL', 'wget -q --spider http://localhost:8080/health/live || exit 1']
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+    # No healthcheck — the minimal aspnet runtime image ships no wget/curl, and
+    # health is orchestrator-owned in prod (Bicep-defined Azure Container Apps
+    # probes). The /health/live + /health/ready endpoints remain available for
+    # manual checks and for the orchestrator. See ADR-0011.
 
   # ───────────────────────────────────────────────────────────────────────────
   # Web (Vite dev server) — OPTIONAL. Prefer `cd src/web && pnpm dev` on the
@@ -140,7 +135,12 @@ services:
     restart: unless-stopped
     depends_on:
       api:
-        condition: service_healthy
+        # service_started (not service_healthy): the api no longer defines a
+        # container healthcheck — health is orchestrator-owned (see api service
+        # above + ADR-0011). The Vite dev server proxies API calls on demand and
+        # tolerates a brief API warm-up, so the first request just retries until
+        # the API is serving.
+        condition: service_started
     environment:
       # Vite reads this to print the right URL on the console.
       VITE_HOST: 0.0.0.0
