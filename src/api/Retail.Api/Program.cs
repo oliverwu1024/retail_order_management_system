@@ -11,6 +11,7 @@ using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Retail.Api.Common.Abstractions;
 using Retail.Api.Data;
 using Retail.Api.Data.Interceptors;
 using Retail.Api.Domain.Entities;
@@ -70,6 +71,13 @@ try
     // — TimeProvider has no per-request state.
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddSingleton(TimeProvider.System);
+
+    // Current-user accessor: the seam the AuditingInterceptor uses to stamp
+    // CreatedBy/UpdatedBy without depending on HttpContext directly. Scoped
+    // because the HTTP-backed implementation wraps the request-scoped
+    // IHttpContextAccessor. Swap this single registration to change where the
+    // "current user" comes from (e.g. a system principal for background jobs).
+    builder.Services.AddScoped<ICurrentUserAccessor, HttpContextCurrentUserAccessor>();
 
     // ── EF Core DbContext + interceptors ────────────────────────────────────
     // The interceptor is registered Scoped so it can capture the per-request
