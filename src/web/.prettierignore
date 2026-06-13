@@ -1,0 +1,18 @@
+# .prettierignore — files Prettier should not check or rewrite.
+#
+# The web `format:check` CI gate runs:
+#   prettier --check "src/**/*.{ts,tsx,css,json}"
+# Anything listed here is skipped by both `format` and `format:check`.
+
+# Generated OpenAPI client types — produced by `pnpm gen:api`
+# (openapi-typescript). The generator owns this file's formatting; running
+# Prettier over it only creates churn that the next `gen:api` undoes, and it is
+# never hand-edited. Excluding generated code from style gates is the standard
+# treatment (the hand-written src/lib/api/client.ts is still formatted).
+src/lib/api/schema.d.ts
+
+# Build output / deps (defensive: the format script only globs src/**, but this
+# keeps an ad-hoc `prettier .` from tripping on them too).
+dist
+coverage
+node_modules
