@@ -41,10 +41,10 @@ jobs:
     name: API · build + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -52,7 +52,7 @@ jobs:
       # The cache key includes every csproj hash so a dependency change
       # busts the cache cleanly.
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
@@ -75,7 +75,7 @@ jobs:
         # Always upload, even on failure, so the .trx is available for
         # post-mortem in the GitHub Actions UI.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-test-results
           path: '**/TestResults/*.trx'
@@ -91,19 +91,19 @@ jobs:
       run:
         working-directory: src/web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up pnpm
         # pnpm/action-setup installs the version pinned in package.json's
         # `packageManager` field (or a fallback). Setting up pnpm BEFORE
         # setup-node lets setup-node's cache-key resolution find the
         # right store path.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
 
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: pnpm
@@ -134,7 +134,7 @@ jobs:
     name: Bicep · build (syntax check)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # `az` is preinstalled on ubuntu-latest; `az bicep install` is
       # idempotent + fast (downloads the bicep CLI into the az cache).

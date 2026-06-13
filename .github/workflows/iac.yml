@@ -46,7 +46,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  # id-token is required for the azure/login@v2 OIDC handshake. contents:read
+  # id-token is required for the azure/login@v3 OIDC handshake. contents:read
   # is the standard checkout permission. Nothing else is granted — least
   # privilege for the workflow itself.
   id-token: write
@@ -57,7 +57,7 @@ jobs:
     name: Bicep · build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Bicep
         run: az bicep install
@@ -84,7 +84,7 @@ jobs:
 
       - name: Upload compiled ARM
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bicep-arm-output
           path: /tmp/bicep-out/
@@ -99,10 +99,10 @@ jobs:
     # leaking deployment intent on every commit.
     if: github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
