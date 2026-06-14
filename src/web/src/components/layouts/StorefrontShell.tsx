@@ -12,6 +12,7 @@ export function StorefrontShell() {
   const user = useAuthStore((state) => state.user)
   const isLoading = useAuthStore((state) => state.isLoading)
   const canAdmin = user?.roles.some((role) => ADMIN_ROLES.includes(role)) ?? false
+  const isCustomer = user?.roles.includes('Customer') ?? false
 
   async function handleSignOut() {
     await apiClient.POST('/api/v1/auth/logout')
@@ -33,6 +34,11 @@ export function StorefrontShell() {
             {!isLoading && canAdmin ? (
               <Link to="/admin" className="text-muted-foreground hover:text-foreground">
                 Admin
+              </Link>
+            ) : null}
+            {!isLoading && isCustomer ? (
+              <Link to="/account" className="text-muted-foreground hover:text-foreground">
+                Account
               </Link>
             ) : null}
             {isLoading ? null : user ? (

@@ -9,3 +9,6 @@ export type ProductDetail = Schemas['ProductDetailDto']
 export type ProductVariant = Schemas['ProductVariantDto']
 export type Category = Schemas['CategoryDto']
 export type ProductPage = Schemas['ProductSummaryDtoPagedResult']
+
+export type CustomerProfile = Schemas['CustomerProfileDto']
+export type Address = Schemas['AddressDto']

@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { RoleGuard } from '@/app/guards/RoleGuard'
 import { StorefrontShell } from '@/components/layouts/StorefrontShell'
+import { AccountPage } from '@/features/account/AccountPage'
 import { AdminHomePage } from '@/features/admin/AdminHomePage'
 import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
 import { ProductFormPage } from '@/features/admin/ProductFormPage'
@@ -23,6 +24,15 @@ export const router = createBrowserRouter([
       { path: '/', element: <CatalogPage /> },
       { path: '/products/:slug', element: <ProductDetailPage /> },
       { path: '/login', element: <LoginPage /> },
+      // My Account is Customer-only — the /profile endpoints require that role.
+      {
+        path: '/account',
+        element: (
+          <RoleGuard allowedRoles={['Customer']}>
+            <AccountPage />
+          </RoleGuard>
+        ),
+      },
       {
         path: '/admin',
         element: (
