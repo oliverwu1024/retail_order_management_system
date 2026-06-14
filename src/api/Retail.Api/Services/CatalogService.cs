@@ -67,6 +67,27 @@ public sealed class CatalogService : ICatalogService
         return categories.Select(c => c.ToDto()).ToList();
     }
 
+    /// <inheritdoc />
+    public async Task<PagedResult<ProductSummaryDto>> ListProductsForAdminAsync(ProductListQuery query, CancellationToken ct)
+    {
+        int page = Math.Max(1, query.Page);
+        int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
+
+        (IReadOnlyList<Product> items, int total) =
+            await _products.ListForAdminAsync(query.CategoryId, query.Search, page, pageSize, ct);
+
+        List<ProductSummaryDto> dtos = items.Select(p => p.ToSummaryDto()).ToList();
+        return new PagedResult<ProductSummaryDto>(dtos, total, page, pageSize);
+    }
+
+    /// <inheritdoc />
+    public async Task<ProductDetailDto> GetProductForAdminAsync(Guid id, CancellationToken ct)
+    {
+        Product product = await _products.GetDetailByIdAsync(id, ct)
+            ?? throw new NotFoundException($"Product '{id}' was not found.");
+        return product.ToDetailDto();
+    }
+
     // ── Admin writes ───────────────────────────────────────────────────────────
 
     /// <inheritdoc />

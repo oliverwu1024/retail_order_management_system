@@ -181,6 +181,48 @@ public class CatalogFlowTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task AdminProductList_IncludesUnpublished_WhilePublicListExcludesIt()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        (string _, string sku) = await CreateUnpublishedProductAsync(admin, csrf, suffix);
+
+        JsonElement adminList = (await (await admin.GetAsync("/api/v1/catalog/admin/products?pageSize=100"))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Contains(adminList.GetProperty("items").EnumerateArray(), i => i.GetProperty("sku").GetString() == sku);
+
+        HttpClient anon = _factory.CreateClient();
+        JsonElement publicList = (await (await anon.GetAsync("/api/v1/catalog/products?pageSize=100"))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.DoesNotContain(publicList.GetProperty("items").EnumerateArray(), i => i.GetProperty("sku").GetString() == sku);
+    }
+
+    [Fact]
+    public async Task AdminGetById_ReturnsUnpublishedProduct()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        (string productId, string sku) = await CreateUnpublishedProductAsync(admin, csrf, suffix);
+
+        HttpResponseMessage resp = await admin.GetAsync($"/api/v1/catalog/admin/products/{productId}");
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement data = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Equal(sku, data.GetProperty("sku").GetString());
+        Assert.False(data.GetProperty("isPublished").GetBoolean());
+    }
+
+    [Fact]
+    public async Task AdminProductList_Anonymous_Returns401()
+    {
+        HttpClient anon = _factory.CreateClient();
+
+        HttpResponseMessage resp = await anon.GetAsync("/api/v1/catalog/admin/products");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, string Csrf)> AdminClientAsync()
@@ -220,6 +262,17 @@ public class CatalogFlowTests
         resp.EnsureSuccessStatusCode();
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         return body.GetProperty("data").GetProperty("id").GetString()!;
+    }
+
+    private static async Task<(string Id, string Sku)> CreateUnpublishedProductAsync(HttpClient admin, string csrf, string suffix)
+    {
+        string categoryId = await CreateCategoryAsync(admin, csrf, $"Cat {suffix}");
+        string sku = $"SKU-{suffix}";
+        HttpResponseMessage resp = await PostJsonAsync(admin, "/api/v1/catalog/products",
+            new { sku, name = $"Draft {suffix}", categoryId, isPublished = false }, csrf);
+        resp.EnsureSuccessStatusCode();
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return (body.GetProperty("data").GetProperty("id").GetString()!, sku);
     }
 
     private static Task<HttpResponseMessage> UploadImageAsync(

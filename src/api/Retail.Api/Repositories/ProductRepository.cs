@@ -82,6 +82,49 @@ public sealed class ProductRepository : IProductRepository
         await _db.ProductVariants.AnyAsync(v => v.Sku == sku, ct);
 
     /// <inheritdoc />
+    public async Task<(IReadOnlyList<Product> Items, int TotalCount)> ListForAdminAsync(
+        Guid? categoryId, string? search, int page, int pageSize, CancellationToken ct)
+    {
+        // Same shape as ListPublishedAsync but WITHOUT the IsPublished filter — admins
+        // manage drafts too. The soft-delete global filter still hides deleted rows.
+        IQueryable<Product> query = _db.Products.AsNoTracking();
+
+        if (categoryId is Guid id)
+        {
+            query = query.Where(p => p.CategoryId == id);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(p =>
+                p.Name.Contains(search)
+                || (p.Description != null && p.Description.Contains(search)));
+        }
+
+        int total = await query.CountAsync(ct);
+
+        List<Product> items = await query
+            .OrderBy(p => p.Name)
+            .ThenBy(p => p.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(p => p.Variants)
+            .ToListAsync(ct);
+
+        return (items, total);
+    }
+
+    /// <inheritdoc />
+    public async Task<Product?> GetDetailByIdAsync(Guid id, CancellationToken ct) =>
+        await _db.Products
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Include(p => p.Category)
+            .Include(p => p.Variants)
+                .ThenInclude(v => v.Inventory)
+            .FirstOrDefaultAsync(ct);
+
+    /// <inheritdoc />
     public async Task AddAsync(Product product, CancellationToken ct) =>
         await _db.Products.AddAsync(product, ct);
 

@@ -77,6 +77,29 @@ public sealed class CatalogController : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<CategoryDto>>.Ok(categories));
     }
 
+    // ── Admin reads (all non-deleted, incl. unpublished; for the admin UI) ────────
+
+    /// <summary>Paged product list for admin management — includes unpublished products.</summary>
+    [HttpGet("admin/products")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ProductSummaryDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListProductsForAdmin([FromQuery] ProductListQuery query, CancellationToken ct)
+    {
+        PagedResult<ProductSummaryDto> result = await _catalog.ListProductsForAdminAsync(query, ct);
+        return Ok(ApiResponse<PagedResult<ProductSummaryDto>>.Ok(result));
+    }
+
+    /// <summary>Product detail by id for the admin edit form — works for unpublished products.</summary>
+    [HttpGet("admin/products/{id:guid}")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProductForAdmin(Guid id, CancellationToken ct)
+    {
+        ProductDetailDto product = await _catalog.GetProductForAdminAsync(id, ct);
+        return Ok(ApiResponse<ProductDetailDto>.Ok(product));
+    }
+
     // ── Admin writes ─────────────────────────────────────────────────────────────
 
     /// <summary>Creates a category.</summary>

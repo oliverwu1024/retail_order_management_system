@@ -24,6 +24,13 @@ public interface IProductRepository
     /// <summary>Whether any variant already uses this (globally-unique) SKU.</summary>
     Task<bool> VariantSkuExistsAsync(string sku, CancellationToken ct);
 
+    /// <summary>Read-only page of ALL non-deleted products (published AND unpublished) for admin management.</summary>
+    Task<(IReadOnlyList<Product> Items, int TotalCount)> ListForAdminAsync(
+        Guid? categoryId, string? search, int page, int pageSize, CancellationToken ct);
+
+    /// <summary>Read-only product by id (any publish state, non-deleted) with category + variants + stock — for the admin edit form.</summary>
+    Task<Product?> GetDetailByIdAsync(Guid id, CancellationToken ct);
+
     /// <summary>Stages a new product for insert.</summary>
     Task AddAsync(Product product, CancellationToken ct);
 

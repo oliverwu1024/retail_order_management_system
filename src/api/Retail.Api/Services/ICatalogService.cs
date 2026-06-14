@@ -16,6 +16,10 @@ public interface ICatalogService
     Task<ProductDetailDto> GetProductBySlugAsync(string slug, CancellationToken ct);
     Task<IReadOnlyList<CategoryDto>> ListCategoriesAsync(CancellationToken ct);
 
+    // ── Admin reads (all non-deleted, INCLUDING unpublished) ──────────────────
+    Task<PagedResult<ProductSummaryDto>> ListProductsForAdminAsync(ProductListQuery query, CancellationToken ct);
+    Task<ProductDetailDto> GetProductForAdminAsync(Guid id, CancellationToken ct);
+
     // ── Admin writes ──────────────────────────────────────────────────────────
     Task<CategoryDto> CreateCategoryAsync(CreateCategoryRequest request, CancellationToken ct);
     Task<ProductDetailDto> CreateProductAsync(CreateProductRequest request, CancellationToken ct);
