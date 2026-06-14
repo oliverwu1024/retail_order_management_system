@@ -15,8 +15,8 @@ public interface IRefreshTokenRepository
     /// <summary>Finds a token by its stored hash, or null. The lookup key on refresh/logout.</summary>
     Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken ct);
 
-    /// <summary>Lists a user's currently-active tokens (not revoked, not expired) — the set revoked on reuse detection.</summary>
-    Task<IReadOnlyList<RefreshToken>> ListActiveByUserAsync(string userId, DateTimeOffset now, CancellationToken ct);
+    /// <summary>Lists a user's not-yet-revoked tokens — the set revoked wholesale on reuse detection.</summary>
+    Task<IReadOnlyList<RefreshToken>> ListNotRevokedByUserAsync(string userId, CancellationToken ct);
 
     /// <summary>Persists all staged changes (inserts + property updates tracked on loaded entities).</summary>
     Task SaveChangesAsync(CancellationToken ct);

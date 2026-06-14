@@ -25,9 +25,13 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RefreshToken>> ListActiveByUserAsync(string userId, DateTimeOffset now, CancellationToken ct) =>
+    public async Task<IReadOnlyList<RefreshToken>> ListNotRevokedByUserAsync(string userId, CancellationToken ct) =>
+        // Filter on RevokedAt only (not expiry): on reuse we revoke the user's whole
+        // live set, and re-revoking an already-expired token is harmless. This also
+        // keeps the query provider-portable — SQLite can't translate a DateTimeOffset
+        // ">" comparison, which a server-side expiry filter would require.
         await _db.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now)
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ToListAsync(ct);
 
     /// <inheritdoc />

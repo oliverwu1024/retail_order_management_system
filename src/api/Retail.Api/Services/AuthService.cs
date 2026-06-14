@@ -128,8 +128,8 @@ public sealed class AuthService : IAuthService
         // makes the thief's copy (and any other live session) worthless.
         if (stored.RevokedAt is not null)
         {
-            IReadOnlyList<RefreshToken> active = await _refreshTokens.ListActiveByUserAsync(stored.UserId, now, ct);
-            foreach (RefreshToken token in active)
+            IReadOnlyList<RefreshToken> live = await _refreshTokens.ListNotRevokedByUserAsync(stored.UserId, ct);
+            foreach (RefreshToken token in live)
             {
                 token.RevokedAt = now;
                 token.ReasonRevoked = "reuse-detected";
@@ -137,8 +137,8 @@ public sealed class AuthService : IAuthService
 
             await _refreshTokens.SaveChangesAsync(ct);
             _logger.LogWarning(
-                "Refresh-token reuse detected for user {UserId}; revoked {Count} active token(s)",
-                stored.UserId, active.Count);
+                "Refresh-token reuse detected for user {UserId}; revoked {Count} live token(s)",
+                stored.UserId, live.Count);
 
             return AuthResult.Fail(AuthError.InvalidRefreshToken, "Session is no longer valid. Please sign in again.");
         }

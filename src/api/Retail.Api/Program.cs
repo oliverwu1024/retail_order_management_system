@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
@@ -116,7 +117,13 @@ try
     // Bind the Jwt / Auth / Auth:DefaultAdmin config sections to typed options so
     // the token service, cookie writer, and seeder inject IOptions<T> instead of
     // indexing raw configuration strings.
-    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+    builder.Services
+        .AddOptions<JwtOptions>()
+        .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+        .Validate(
+            o => !string.IsNullOrWhiteSpace(o.Key) && o.Key.Length >= 32,
+            "Jwt:Key must be configured with at least 32 characters (User Secrets / Key Vault).")
+        .ValidateOnStart();
     builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection(AuthSettings.SectionName));
     builder.Services.Configure<DefaultAdminOptions>(builder.Configuration.GetSection(DefaultAdminOptions.SectionName));
 
@@ -159,47 +166,50 @@ try
         .AddDefaultTokenProviders();
 
     // ── JWT Bearer authentication ───────────────────────────────────────────
-    // We use JWT for the API (mobile + SPA via httpOnly cookie wrapper — the
-    // cookie carries the JWT, the API validates it as a bearer token). All
-    // four validations are ON: issuer, audience, lifetime, signing key.
-    // Disabling any of these is the classic JWT misconfiguration that ends up
-    // on a CVE list.
-    var jwtKey = builder.Configuration["Jwt:Key"]
-        ?? throw new InvalidOperationException(
-            "Jwt:Key not configured. Set Jwt:Key in appsettings (32+ chars) or User Secrets.");
-
+    // We use JWT for the API: the access token rides in an HttpOnly cookie
+    // (ADR-0007) and is validated as a bearer token. All four validations are ON
+    // (issuer, audience, lifetime, signing key) — disabling any is the classic JWT
+    // misconfiguration that lands on a CVE list.
     builder.Services
         .AddAuthentication(options =>
         {
-            // Bearer is now the ONLY authentication scheme — AddIdentityCore (above)
-            // registered no competing cookie schemes. We still set all three defaults
+            // Bearer is the ONLY authentication scheme — AddIdentityCore (above)
+            // registered no competing cookie schemes. We set all three defaults
             // explicitly so [Authorize], challenges, and an unnamed
             // AuthenticateAsync() all resolve to Bearer — unambiguous and self-documenting.
             options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         })
-        .AddJwtBearer(options =>
+        .AddJwtBearer();
+
+    // Configure the Bearer options from the bound JwtOptions — the SINGLE source of
+    // truth shared with JwtService (which mints the tokens). Reading via injected
+    // IOptions<JwtOptions> (instead of indexing builder.Configuration here) resolves
+    // the values AFTER configuration is finalized, so minting and validation can
+    // never diverge — including when an integration test overrides Jwt:* via
+    // in-memory configuration that is layered on after startup begins.
+    builder.Services
+        .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+        .Configure<IOptions<JwtOptions>>((bearer, jwtOptionsAccessor) =>
         {
-            options.TokenValidationParameters = new TokenValidationParameters
+            JwtOptions jwt = jwtOptionsAccessor.Value;
+            bearer.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                ValidAudience = builder.Configuration["Jwt:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                // Default ClockSkew is 5 minutes — generous enough to absorb
-                // small clock drift between issuer and validator without
-                // letting expired tokens linger. We keep the default.
+                ValidIssuer = jwt.Issuer,
+                ValidAudience = jwt.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key)),
+                // Default ClockSkew (5 min) absorbs small issuer/validator clock drift.
             };
 
-            // The access token rides in an HttpOnly cookie (ADR-0007), not the
-            // Authorization header. Pull it from the cookie before validation; if
-            // absent, JwtBearer's default header extraction still runs (used by
-            // Swagger's Authorize box in dev).
-            options.Events = new JwtBearerEvents
+            // The access token rides in an HttpOnly cookie, not the Authorization
+            // header. Pull it from the cookie before validation; if absent, the
+            // default header extraction still runs (used by Swagger's Authorize box).
+            bearer.Events = new JwtBearerEvents
             {
                 OnMessageReceived = context =>
                 {
