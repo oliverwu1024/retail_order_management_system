@@ -12,10 +12,14 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Retail.Api.Common.Abstractions;
+using Retail.Api.Common.Constants;
 using Retail.Api.Data;
 using Retail.Api.Data.Interceptors;
 using Retail.Api.Domain.Entities;
+using Retail.Api.Identity;
 using Retail.Api.Middlewares;
+using Retail.Api.Repositories;
+using Retail.Api.Services;
 using Serilog;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,19 +112,40 @@ try
         options.AddInterceptors(sp.GetRequiredService<AuditingInterceptor>());
     });
 
-    // ── ASP.NET Identity ────────────────────────────────────────────────────
-    // AddIdentity wires the full Identity stack (UserManager, SignInManager,
-    // RoleManager, token providers for password reset / email confirm). We
-    // tighten the password policy from the defaults (which allow 6 chars and
-    // require special chars) — 8 chars, no required special char, is the
-    // current OWASP-aligned baseline for consumer apps.
+    // ── Strongly-typed auth options ─────────────────────────────────────────
+    // Bind the Jwt / Auth / Auth:DefaultAdmin config sections to typed options so
+    // the token service, cookie writer, and seeder inject IOptions<T> instead of
+    // indexing raw configuration strings.
+    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+    builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection(AuthSettings.SectionName));
+    builder.Services.Configure<DefaultAdminOptions>(builder.Configuration.GetSection(DefaultAdminOptions.SectionName));
+
+    // ── ASP.NET Identity (core) ──────────────────────────────────────────────
+    // AddIdentityCore — NOT AddIdentity — because this is a token API, not a
+    // cookie/Razor app. AddIdentity registers four unused authentication COOKIE
+    // schemes (Identity.Application / External / two 2FA schemes) AND sets them as
+    // the default authenticate/challenge schemes — which then fight our Bearer
+    // default and 401 every [Authorize]. AddIdentityCore registers none of that,
+    // so Bearer (configured below) is the sole, uncontested scheme. We re-add only
+    // the pieces a JWT flow actually uses:
+    //   • AddRoles                 → RoleManager + role store (seeder + AddToRole).
+    //   • AddEntityFrameworkStores → user/role EF stores (MUST come after AddRoles,
+    //                                or the role store is never registered).
+    //   • AddSignInManager         → SignInManager.CheckPasswordSignInAsync (lockout-aware).
+    //   • AddDefaultTokenProviders → password-reset / email-confirm tokens (Phase 1.4).
+    //
+    // Password policy → PRD §1.1: ≥12 chars containing at least one letter and one
+    // digit. We enforce length + digit HERE and delegate the "must contain a
+    // letter" rule to RegisterRequestValidator — Identity has no single "any
+    // letter" switch (only lower/upper), and splitting it this way keeps Identity
+    // from rejecting a password the validator already accepted.
     builder.Services
-        .AddIdentity<ApplicationUser, IdentityRole>(options =>
+        .AddIdentityCore<ApplicationUser>(options =>
         {
-            options.Password.RequiredLength = 8;
+            options.Password.RequiredLength = 12;
             options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireUppercase = false;
             options.Password.RequireNonAlphanumeric = false;
 
             options.User.RequireUniqueEmail = true;
@@ -128,7 +153,9 @@ try
             options.Lockout.MaxFailedAccessAttempts = 5;
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         })
+        .AddRoles<IdentityRole>()
         .AddEntityFrameworkStores<RetailDbContext>()
+        .AddSignInManager()
         .AddDefaultTokenProviders();
 
     // ── JWT Bearer authentication ───────────────────────────────────────────
@@ -142,7 +169,16 @@ try
             "Jwt:Key not configured. Set Jwt:Key in appsettings (32+ chars) or User Secrets.");
 
     builder.Services
-        .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddAuthentication(options =>
+        {
+            // Bearer is now the ONLY authentication scheme — AddIdentityCore (above)
+            // registered no competing cookie schemes. We still set all three defaults
+            // explicitly so [Authorize], challenges, and an unnamed
+            // AuthenticateAsync() all resolve to Bearer — unambiguous and self-documenting.
+            options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
         .AddJwtBearer(options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
@@ -158,9 +194,52 @@ try
                 // small clock drift between issuer and validator without
                 // letting expired tokens linger. We keep the default.
             };
+
+            // The access token rides in an HttpOnly cookie (ADR-0007), not the
+            // Authorization header. Pull it from the cookie before validation; if
+            // absent, JwtBearer's default header extraction still runs (used by
+            // Swagger's Authorize box in dev).
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    if (context.Request.Cookies.TryGetValue(AuthConstants.AccessTokenCookie, out string? cookieToken)
+                        && !string.IsNullOrEmpty(cookieToken))
+                    {
+                        context.Token = cookieToken;
+                    }
+
+                    return Task.CompletedTask;
+                },
+            };
         });
 
     builder.Services.AddAuthorization();
+
+    // ── Auth services (ADR-0007) ────────────────────────────────────────────
+    // JwtService + CsrfTokenService are immutable after construction → singletons.
+    // AuthService + the refresh-token repository are request-scoped (they touch the
+    // scoped DbContext). The seeder is scoped and resolved once at startup.
+    builder.Services.AddSingleton<IJwtService, JwtService>();
+    builder.Services.AddSingleton<ICsrfTokenService, CsrfTokenService>();
+    builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IdentityDataSeeder>();
+
+    // ── CORS for the SPA ─────────────────────────────────────────────────────
+    // Cookie auth is cross-ORIGIN in dev (SPA :5173 → API :7015) even though it is
+    // same-SITE, so the browser requires an explicit credentialed CORS grant:
+    // named origins (a wildcard is illegal with credentials) + AllowCredentials.
+    string[] corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? Array.Empty<string>();
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("spa", policy => policy
+            .WithOrigins(corsOrigins)
+            .AllowCredentials()
+            .AllowAnyHeader()
+            .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE"));
+    });
 
     // ── MVC controllers ─────────────────────────────────────────────────────
     // CamelCase property naming matches what the React client expects.
@@ -173,6 +252,15 @@ try
             opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
             opts.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         });
+
+    // FluentValidation (invoked explicitly in controllers) owns request validation
+    // and returns our ApiResponse 422. Suppress [ApiController]'s automatic 400
+    // ProblemDetails so the two don't compete; malformed JSON still 400s at the
+    // input formatter.
+    builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+    {
+        options.SuppressModelStateInvalidFilter = true;
+    });
 
     // ── FluentValidation ────────────────────────────────────────────────────
     // AddValidatorsFromAssemblyContaining scans this assembly for any class
@@ -283,11 +371,19 @@ try
     //    routing and endpoints is unambiguous.
     app.UseRouting();
 
-    // 5. AuthN then AuthZ. Both required and in this order.
+    // 5. CORS — between routing and auth, so preflight + credentialed cross-origin
+    //    calls from the SPA are honoured before authentication runs.
+    app.UseCors("spa");
+
+    // 6. AuthN then AuthZ. Both required and in this order.
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // 6. Endpoints: controllers + health probes.
+    // 7. CSRF — signed double-submit check on state-changing requests (ADR-0007).
+    //    Sits after auth, close to the endpoints it protects; safe methods pass through.
+    app.UseMiddleware<CsrfMiddleware>();
+
+    // 8. Endpoints: controllers + health probes.
     app.MapControllers();
 
     // Liveness: returns 200 if the process can respond — no dependency checks.
@@ -305,6 +401,23 @@ try
         Predicate = check => check.Tags.Contains("ready"),
     });
 
+    // ── Seed roles + default admin (idempotent, best-effort) ─────────────────
+    // Runs in a DI scope after the host is built. A missing/unreachable DB logs an
+    // error but does NOT abort startup — this keeps the boot smoke test and any
+    // DB-less start working; real dev seeds once `dotnet ef database update` ran.
+    using (IServiceScope scope = app.Services.CreateScope())
+    {
+        try
+        {
+            IdentityDataSeeder seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
+            await seeder.SeedAsync();
+        }
+        catch (Exception seedException)
+        {
+            Log.Error(seedException, "Identity seeding failed; continuing startup.");
+        }
+    }
+
     app.Run();
 }
 catch (Exception ex)
@@ -320,3 +433,8 @@ finally
     // this, the final fatal log line can be lost.
     Log.CloseAndFlush();
 }
+
+// Exposes the top-level-statement entry point as a public type so integration
+// tests can drive it via WebApplicationFactory<Program>. (Without this, the
+// generated Program class is internal and the test project cannot name it.)
+public partial class Program { }

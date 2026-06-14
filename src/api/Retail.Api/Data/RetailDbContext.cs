@@ -57,6 +57,12 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     // explicitly — they're not provided by the base.
 
     /// <summary>
+    /// Issued refresh tokens (stored as hashes). Backs ADR-0007's refresh-token
+    /// rotation + reuse detection; mapped by <c>RefreshTokenConfiguration</c>.
+    /// </summary>
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.
     /// </summary>
