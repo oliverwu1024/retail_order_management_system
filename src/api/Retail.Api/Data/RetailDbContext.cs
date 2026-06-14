@@ -75,6 +75,13 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Per-variant stock (1:1 with <see cref="ProductVariant"/>).</summary>
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
 
+    // ── Customer profile (Story 1.4) ─────────────────────────────────────────
+    /// <summary>Customer domain profiles (1:1 with an Identity user). Not soft-deletable.</summary>
+    public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
+
+    /// <summary>Saved shipping/billing addresses (owned by a <see cref="CustomerProfile"/>). Not soft-deletable.</summary>
+    public DbSet<Address> Addresses => Set<Address>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.

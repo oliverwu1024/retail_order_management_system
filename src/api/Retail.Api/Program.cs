@@ -242,6 +242,10 @@ try
     builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
     builder.Services.AddScoped<ICatalogService, CatalogService>();
 
+    // ── Customer profile services (Story 1.4) ────────────────────────────────
+    builder.Services.AddScoped<ICustomerProfileRepository, CustomerProfileRepository>();
+    builder.Services.AddScoped<ICustomerProfileService, CustomerProfileService>();
+
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
     // catalogue reads — only an actual image upload.
