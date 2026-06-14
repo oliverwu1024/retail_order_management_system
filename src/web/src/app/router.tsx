@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router-dom'
 import { RoleGuard } from '@/app/guards/RoleGuard'
 import { StorefrontShell } from '@/components/layouts/StorefrontShell'
 import { AdminHomePage } from '@/features/admin/AdminHomePage'
+import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
+import { ProductFormPage } from '@/features/admin/ProductFormPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { CatalogPage } from '@/features/storefront/CatalogPage'
 import { ProductDetailPage } from '@/features/storefront/ProductDetailPage'
@@ -26,6 +28,33 @@ export const router = createBrowserRouter([
         element: (
           <RoleGuard allowedRoles={['Administrator', 'StoreManager']}>
             <AdminHomePage />
+          </RoleGuard>
+        ),
+      },
+      // Product management is Administrator-only — the backend admin catalog
+      // endpoints require that role, so the guard matches. React Router ranks
+      // the static "new" segment above the ":id" param, so both resolve right.
+      {
+        path: '/admin/products',
+        element: (
+          <RoleGuard allowedRoles={['Administrator']}>
+            <AdminProductsPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: '/admin/products/new',
+        element: (
+          <RoleGuard allowedRoles={['Administrator']}>
+            <ProductFormPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: '/admin/products/:id',
+        element: (
+          <RoleGuard allowedRoles={['Administrator']}>
+            <ProductFormPage />
           </RoleGuard>
         ),
       },

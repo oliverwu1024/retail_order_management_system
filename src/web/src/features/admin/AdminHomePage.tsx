@@ -1,8 +1,11 @@
+import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Admin dashboard — Phase 0 placeholder. Wrapped in <RoleGuard> in the
 // router so unauthenticated or non-admin users are redirected before
-// this renders.
+// this renders. The full dashboard lands in Phase 3; for now it links to
+// the product management built in Story 1.3.
 export function AdminHomePage() {
   return (
     <main className="container mx-auto max-w-3xl py-10">
@@ -10,14 +13,13 @@ export function AdminHomePage() {
         <CardHeader>
           <CardTitle>Admin</CardTitle>
           <CardDescription>
-            Phase 0 placeholder. Real dashboard lands in Phase 3 (admin foundations).
+            Manage the catalogue. The full dashboard lands in Phase 3 (admin foundations).
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm">
-            If you can see this page, the route guard let you through — meaning the auth store has a
-            user with an Admin or StoreManager role claim.
-          </p>
+          <Button asChild>
+            <Link to="/admin/products">Manage products</Link>
+          </Button>
         </CardContent>
       </Card>
     </main>
