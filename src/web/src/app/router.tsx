@@ -1,33 +1,31 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { RoleGuard } from '@/app/guards/RoleGuard'
+import { StorefrontShell } from '@/components/layouts/StorefrontShell'
 import { AdminHomePage } from '@/features/admin/AdminHomePage'
-import { HomePage } from '@/features/storefront/HomePage'
+import { CatalogPage } from '@/features/storefront/CatalogPage'
+import { ProductDetailPage } from '@/features/storefront/ProductDetailPage'
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Application router (React Router v6.4+ data router).
+//  Application router (React Router v7 data router).
 //
-//  WHY THE DATA ROUTER (createBrowserRouter) INSTEAD OF <BrowserRouter>?
-//  --------------------------------------------------------------------
-//  The data router unlocks loaders, actions, and deferred data. Even
-//  though we use TanStack Query for most data fetching, route-level
-//  loaders are still the right place for guards / auth checks / SSR-
-//  friendly preloading. Starting on the data router keeps that option
-//  open without a future migration.
-//
-//  Routes are intentionally flat at this stage. When admin sprouts a
-//  shell layout (Phase 3), we'll add nested <Outlet /> children for the
-//  sub-sections.
+//  Storefront routes share a <StorefrontShell /> layout (header + <Outlet />).
+//  Admin keeps its own RoleGuard branch and will grow a shell layout in Phase 3.
+//  Role names match the backend's seeded roles (Administrator / StoreManager /
+//  Staff / Customer) — NOT "Admin".
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <HomePage />,
+    element: <StorefrontShell />,
+    children: [
+      { path: '/', element: <CatalogPage /> },
+      { path: '/products/:slug', element: <ProductDetailPage /> },
+    ],
   },
   {
     path: '/admin',
     element: (
-      <RoleGuard allowedRoles={['Admin', 'StoreManager']}>
+      <RoleGuard allowedRoles={['Administrator', 'StoreManager']}>
         <AdminHomePage />
       </RoleGuard>
     ),
