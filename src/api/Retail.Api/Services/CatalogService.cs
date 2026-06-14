@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Retail.Api.Common.Helpers;
 using Retail.Api.Common.Models;
 using Retail.Api.Domain.Entities;
@@ -6,6 +7,7 @@ using Retail.Api.DTOs.Responses;
 using Retail.Api.Exceptions;
 using Retail.Api.Mappers;
 using Retail.Api.Repositories;
+using Retail.Api.Storage;
 
 namespace Retail.Api.Services;
 
@@ -17,15 +19,21 @@ public sealed class CatalogService : ICatalogService
 
     private readonly IProductRepository _products;
     private readonly ICategoryRepository _categories;
+    private readonly IBlobStorageClient _blob;
+    private readonly BlobStorageOptions _storage;
     private readonly ILogger<CatalogService> _logger;
 
     public CatalogService(
         IProductRepository products,
         ICategoryRepository categories,
+        IBlobStorageClient blob,
+        IOptions<BlobStorageOptions> storage,
         ILogger<CatalogService> logger)
     {
         _products = products;
         _categories = categories;
+        _blob = blob;
+        _storage = storage.Value;
         _logger = logger;
     }
 
@@ -160,6 +168,24 @@ public sealed class CatalogService : ICatalogService
         await _products.SaveChangesAsync(ct);
 
         _logger.LogInformation("Soft-deleted product {ProductId}", product.Id);
+    }
+
+    /// <inheritdoc />
+    public async Task<ProductDetailDto> SetProductPrimaryImageAsync(Guid id, Stream content, string contentType, CancellationToken ct)
+    {
+        Product product = await _products.GetByIdForWriteAsync(id, ct)
+            ?? throw new NotFoundException($"Product '{id}' was not found.");
+
+        // Unique key per upload (no overwrite); old blobs are left for a later cleanup job.
+        string extension = ProductImage.ExtensionFor(contentType);
+        string blobKey = $"products/{product.Id:N}/{Guid.NewGuid():N}.{extension}";
+        await _blob.UploadAsync(_storage.ProductImagesContainer, blobKey, content, contentType, ct);
+
+        product.PrimaryImageBlobKey = blobKey;
+        await _products.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Set primary image for product {ProductId} -> {BlobKey}", product.Id, blobKey);
+        return product.ToDetailDto();
     }
 
     /// <inheritdoc />

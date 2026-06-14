@@ -21,6 +21,7 @@ using Retail.Api.Identity;
 using Retail.Api.Middlewares;
 using Retail.Api.Repositories;
 using Retail.Api.Services;
+using Retail.Api.Storage;
 using Serilog;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,6 +241,12 @@ try
     builder.Services.AddScoped<IProductRepository, ProductRepository>();
     builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
     builder.Services.AddScoped<ICatalogService, CatalogService>();
+
+    // Blob storage (product images → Azure Blob / Azurite). The client builds its
+    // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
+    // catalogue reads — only an actual image upload.
+    builder.Services.Configure<BlobStorageOptions>(builder.Configuration.GetSection(BlobStorageOptions.SectionName));
+    builder.Services.AddSingleton<IBlobStorageClient, BlobStorageClient>();
 
     // ── CORS for the SPA ─────────────────────────────────────────────────────
     // Cookie auth is cross-ORIGIN in dev (SPA :5173 → API :7015) even though it is

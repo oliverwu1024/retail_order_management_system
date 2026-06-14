@@ -21,6 +21,7 @@ public interface ICatalogService
     Task<ProductDetailDto> CreateProductAsync(CreateProductRequest request, CancellationToken ct);
     Task<ProductDetailDto> UpdateProductAsync(Guid id, UpdateProductRequest request, CancellationToken ct);
     Task SoftDeleteProductAsync(Guid id, CancellationToken ct);
+    Task<ProductDetailDto> SetProductPrimaryImageAsync(Guid id, Stream content, string contentType, CancellationToken ct);
     Task<ProductVariantDto> AddVariantAsync(Guid productId, CreateVariantRequest request, CancellationToken ct);
     Task<ProductVariantDto> UpdateVariantAsync(Guid productId, Guid variantId, UpdateVariantRequest request, CancellationToken ct);
     Task DeleteVariantAsync(Guid productId, Guid variantId, CancellationToken ct);

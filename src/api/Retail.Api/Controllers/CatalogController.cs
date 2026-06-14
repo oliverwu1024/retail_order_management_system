@@ -3,6 +3,7 @@ using FluentValidation.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Retail.Api.Common.Constants;
+using Retail.Api.Common.Helpers;
 using Retail.Api.Common.Models;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
@@ -134,6 +135,33 @@ public sealed class CatalogController : ControllerBase
     {
         await _catalog.SoftDeleteProductAsync(id, ct);
         return Ok(ApiResponse.Ok("Product deleted."));
+    }
+
+    /// <summary>Uploads/replaces a product's primary image (jpg/png/webp, ≤5 MB) → Blob (Task 1.2.8).</summary>
+    [HttpPost("products/{id:guid}/image")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> UploadProductImage(Guid id, IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return UnprocessableEntity(ApiResponse.Fail("An image file is required."));
+        }
+
+        if (file.Length > ProductImage.MaxBytes)
+        {
+            return UnprocessableEntity(ApiResponse.Fail($"Image exceeds the {ProductImage.MaxBytes / (1024 * 1024)} MB limit."));
+        }
+
+        if (!ProductImage.IsAllowedContentType(file.ContentType))
+        {
+            return UnprocessableEntity(ApiResponse.Fail("Only JPEG, PNG, or WebP images are allowed."));
+        }
+
+        await using Stream stream = file.OpenReadStream();
+        ProductDetailDto product = await _catalog.SetProductPrimaryImageAsync(id, stream, file.ContentType, ct);
+        return Ok(ApiResponse<ProductDetailDto>.Ok(product));
     }
 
     /// <summary>Adds a variant (and its initial stock) to a product.</summary>
