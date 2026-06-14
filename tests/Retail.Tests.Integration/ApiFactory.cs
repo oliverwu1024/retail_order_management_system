@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Retail.Api.Data;
+using Testcontainers.Azurite;
 using Testcontainers.MsSql;
 
 namespace Retail.Tests.Integration;
@@ -39,12 +40,19 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private readonly MsSqlContainer _sql =
         new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
+    // Azurite for the product-image upload path (Task 1.2.8).
+    private readonly AzuriteContainer _azurite =
+        new AzuriteBuilder("mcr.microsoft.com/azure-storage/azurite:latest").Build();
+
     private string _connectionString = string.Empty;
+    private string _blobConnectionString = string.Empty;
 
     /// <summary>xUnit calls this once before the class's tests: start SQL Server, migrate the schema.</summary>
     public async Task InitializeAsync()
     {
-        await _sql.StartAsync();
+        await Task.WhenAll(_sql.StartAsync(), _azurite.StartAsync());
+
+        _blobConnectionString = _azurite.GetConnectionString();
 
         // Target a dedicated database (not master) on the throwaway container.
         _connectionString = new SqlConnectionStringBuilder(_sql.GetConnectionString())
@@ -83,6 +91,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Auth:DefaultAdmin:Email"] = "admin@test.local",
                 ["Auth:DefaultAdmin:Password"] = "TestAdmin123456",
                 ["Auth:DefaultAdmin:DisplayName"] = "Test Admin",
+                ["Storage:ConnectionString"] = _blobConnectionString,
+                ["Storage:ProductImagesContainer"] = "product-images",
             });
         });
     }
@@ -95,6 +105,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     async Task IAsyncLifetime.DisposeAsync()
     {
         await _sql.DisposeAsync();
+        await _azurite.DisposeAsync();
         await base.DisposeAsync();
     }
 }

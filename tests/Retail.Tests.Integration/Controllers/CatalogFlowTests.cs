@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace Retail.Tests.Integration.Controllers;
@@ -150,6 +152,35 @@ public class CatalogFlowTests
         Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task AdminUploadsImage_SetsPrimaryImageKey()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        HttpResponseMessage resp = await UploadImageAsync(admin, productId, MinimalPng(), "image/png", "p.png", csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement data = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        string? key = data.GetProperty("primaryImageBlobKey").GetString();
+        Assert.StartsWith("products/", key);
+        Assert.EndsWith(".png", key);
+    }
+
+    [Fact]
+    public async Task UploadImage_DisallowedContentType_Returns422()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        HttpResponseMessage resp = await UploadImageAsync(
+            admin, productId, Encoding.UTF8.GetBytes("not an image"), "text/plain", "p.txt", csrf);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, string Csrf)> AdminClientAsync()
@@ -180,6 +211,34 @@ public class CatalogFlowTests
         JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         return body.GetProperty("data").GetProperty("id").GetString()!;
     }
+
+    private static async Task<string> CreateProductAsync(HttpClient admin, string csrf, string suffix)
+    {
+        string categoryId = await CreateCategoryAsync(admin, csrf, $"Cat {suffix}");
+        HttpResponseMessage resp = await PostJsonAsync(admin, "/api/v1/catalog/products",
+            new { sku = $"SKU-{suffix}", name = $"Product {suffix}", categoryId, isPublished = true }, csrf);
+        resp.EnsureSuccessStatusCode();
+        JsonElement body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        return body.GetProperty("data").GetProperty("id").GetString()!;
+    }
+
+    private static Task<HttpResponseMessage> UploadImageAsync(
+        HttpClient client, string productId, byte[] bytes, string contentType, string fileName, string csrf)
+    {
+        var fileContent = new ByteArrayContent(bytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        var form = new MultipartFormDataContent { { fileContent, "file", fileName } };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/catalog/products/{productId}/image") { Content = form };
+        request.Headers.Add("X-CSRF-Token", csrf);
+        return client.SendAsync(request);
+    }
+
+    // A 1x1 transparent PNG — enough to exercise the upload path (the endpoint validates
+    // content type + size, not the pixel data).
+    private static byte[] MinimalPng() =>
+        Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
 
     private static Task<HttpResponseMessage> PostJsonAsync(HttpClient client, string path, object body, string csrf) =>
         SendJsonAsync(client, HttpMethod.Post, path, body, csrf);
