@@ -15,11 +15,12 @@ namespace Retail.Tests.Integration.Controllers;
 /// interfere. <c>CreateClient()</c> auto-persists cookies between requests on the
 /// same client, mirroring a browser.
 /// </remarks>
-public class AuthFlowTests : IClassFixture<AuthApiFactory>
+[Collection("api")]
+public class AuthFlowTests
 {
-    private readonly AuthApiFactory _factory;
+    private readonly ApiFactory _factory;
 
-    public AuthFlowTests(AuthApiFactory factory)
+    public AuthFlowTests(ApiFactory factory)
     {
         _factory = factory;
     }

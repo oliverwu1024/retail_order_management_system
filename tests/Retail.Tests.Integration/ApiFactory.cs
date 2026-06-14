@@ -11,16 +11,16 @@ namespace Retail.Tests.Integration;
 /// <summary>
 /// Boots the real <c>Retail.Api</c> pipeline in-process (TestServer) against a real
 /// SQL Server in a throwaway Testcontainers container — production-identical, per
-/// CODING_STANDARDS (integration tests use Testcontainers SQL Server).
+/// CODING_STANDARDS. Shared by every integration test class (auth, catalog, ...).
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Why a real SQL Server, not SQLite.</b> The app ships on SQL Server; SQLite is
 /// a different engine with real behavioural gaps (e.g. it can't translate a
-/// <c>DateTimeOffset</c> comparison). Testing on the engine we deploy on removes the
-/// "passes on SQLite, behaves differently on SQL Server" risk — at the cost of a
-/// ~15–30s container spin-up and a Docker dependency at test time (CI runners and
-/// this dev box both have Docker).
+/// <c>DateTimeOffset</c> comparison, and has no <c>rowversion</c> or filtered
+/// indexes). Testing on the engine we deploy on removes the "passes on SQLite,
+/// behaves differently on SQL Server" risk — at the cost of a container spin-up and
+/// a Docker dependency at test time (CI runners and this dev box both have Docker).
 /// </para>
 /// <para>
 /// <b>How the DB is wired.</b> We do NOT swap the DbContext registration. We start
@@ -31,7 +31,7 @@ namespace Retail.Tests.Integration;
 /// roles + the test admin.
 /// </para>
 /// </remarks>
-public sealed class AuthApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     // Reuse the image docker-compose already pulls, so the container starts from
     // cache rather than a fresh pull. (Image passed to the ctor — the parameterless
