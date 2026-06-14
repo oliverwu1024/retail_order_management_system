@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -76,6 +76,13 @@ export function LoginPage() {
               {submitting ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Don’t have an account?{' '}
+            <Link to="/register" className="text-primary hover:underline">
+              Create one
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

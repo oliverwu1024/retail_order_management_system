@@ -6,6 +6,7 @@ import { AdminHomePage } from '@/features/admin/AdminHomePage'
 import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
 import { ProductFormPage } from '@/features/admin/ProductFormPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { RegisterPage } from '@/features/auth/RegisterPage'
 import { CatalogPage } from '@/features/storefront/CatalogPage'
 import { ProductDetailPage } from '@/features/storefront/ProductDetailPage'
 
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <CatalogPage /> },
       { path: '/products/:slug', element: <ProductDetailPage /> },
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       // My Account is Customer-only — the /profile endpoints require that role.
       {
         path: '/account',
