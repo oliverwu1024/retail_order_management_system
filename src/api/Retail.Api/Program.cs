@@ -236,6 +236,11 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IdentityDataSeeder>();
 
+    // ── Catalog services (Story 1.2) ─────────────────────────────────────────
+    builder.Services.AddScoped<IProductRepository, ProductRepository>();
+    builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+    builder.Services.AddScoped<ICatalogService, CatalogService>();
+
     // ── CORS for the SPA ─────────────────────────────────────────────────────
     // Cookie auth is cross-ORIGIN in dev (SPA :5173 → API :7015) even though it is
     // same-SITE, so the browser requires an explicit credentialed CORS grant:

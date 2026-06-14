@@ -62,6 +62,19 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// </summary>
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    // ── Catalog (Story 1.2) ──────────────────────────────────────────────────
+    /// <summary>Product categories (self-referencing tree). Soft-deletable.</summary>
+    public DbSet<Category> Categories => Set<Category>();
+
+    /// <summary>Catalogue products. Soft-deletable.</summary>
+    public DbSet<Product> Products => Set<Product>();
+
+    /// <summary>Purchasable product variants (price + options + stock).</summary>
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+
+    /// <summary>Per-variant stock (1:1 with <see cref="ProductVariant"/>).</summary>
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.
@@ -92,11 +105,17 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
         //    the migration will be silently incomplete.
         base.OnModelCreating(builder);
 
-        // 2. Apply every IEntityTypeConfiguration<T> found in this assembly.
-        //    For now there are none (we haven't added domain entities yet),
-        //    so this is a no-op — but having it in place means future entities
-        //    just need to drop their configuration class into
-        //    Data/Configurations/ and they're picked up automatically.
+        // 2. Apply every IEntityTypeConfiguration<T> found in this assembly
+        //    (RefreshToken, ApplicationUser, Category/Product/ProductVariant/
+        //    InventoryItem, ...). New entities just drop a configuration class into
+        //    Data/Configurations/ and are picked up automatically.
         builder.ApplyConfigurationsFromAssembly(typeof(RetailDbContext).Assembly);
+
+        // 3. Soft-delete global query filters (Task 1.2.9). Rows with IsDeleted=true
+        //    become invisible to every ordinary query; the admin "show deleted" view
+        //    opts back in with IgnoreQueryFilters(). Only Product + Category are
+        //    soft-deletable (DATABASE_DESIGN §1).
+        builder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
+        builder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
     }
 }

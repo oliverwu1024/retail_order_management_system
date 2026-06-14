@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Retail.Api.Common.Models;
+using Retail.Api.Exceptions;
 
 namespace Retail.Api.Middlewares;
 
@@ -110,6 +111,14 @@ public class ExceptionMiddleware
         // BusinessRuleException, etc.).
         var (status, code, message) = ex switch
         {
+            // Domain "not found" — surfaces the (safe) message, e.g. "Product 'x' not found".
+            NotFoundException =>
+                (StatusCodes.Status404NotFound, "NOT_FOUND", ex.Message),
+
+            // Domain conflict — duplicate SKU/slug, business-rule violation, etc.
+            ConflictException =>
+                (StatusCodes.Status409Conflict, "CONFLICT", ex.Message),
+
             // EF Core raises this when an UPDATE/DELETE affects 0 rows because
             // another transaction beat us to it (optimistic concurrency via
             // a rowversion/timestamp column). 409 is the canonical mapping.
