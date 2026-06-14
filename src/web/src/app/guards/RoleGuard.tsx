@@ -29,7 +29,7 @@ interface RoleGuardProps {
   children: ReactNode
 }
 
-export function RoleGuard({ allowedRoles = [], redirectTo = '/', children }: RoleGuardProps) {
+export function RoleGuard({ allowedRoles = [], redirectTo = '/login', children }: RoleGuardProps) {
   const { user, isLoading } = useAuthStore()
   const location = useLocation()
 

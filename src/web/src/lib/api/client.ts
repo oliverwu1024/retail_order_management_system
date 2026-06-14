@@ -21,8 +21,8 @@ import type { paths } from '@/lib/api/schema'
 //  attaches on same-origin requests, which means the browser sends auth
 //  for free — including on cross-site malicious form submits (the
 //  textbook CSRF). The defense is double-submit:
-//    - Backend sets a NON-httpOnly cookie XSRF-TOKEN with a random value.
-//    - SPA reads it from document.cookie and echoes it as X-XSRF-TOKEN
+//    - Backend sets a NON-httpOnly cookie `csrf` with a random signed value.
+//    - SPA reads it from document.cookie and echoes it as the X-CSRF-Token
 //      header on every state-changing request.
 //    - Backend rejects requests whose header doesn't match the cookie.
 //  An attacker's site can't read the cookie (same-origin policy on JS
@@ -45,9 +45,9 @@ function readCookie(name: string): string | null {
 const csrfMiddleware: Middleware = {
   async onRequest({ request }) {
     if (STATE_CHANGING_METHODS.has(request.method.toUpperCase())) {
-      const token = readCookie('XSRF-TOKEN')
+      const token = readCookie('csrf')
       if (token) {
-        request.headers.set('X-XSRF-TOKEN', token)
+        request.headers.set('X-CSRF-Token', token)
       }
     }
     return request
