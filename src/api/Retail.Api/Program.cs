@@ -125,6 +125,14 @@ try
             o => !string.IsNullOrWhiteSpace(o.Key) && o.Key.Length >= 32,
             "Jwt:Key must be configured with at least 32 characters (User Secrets / Key Vault).")
         .ValidateOnStart();
+    // Dedicated CSRF signing key (key separation from Jwt:Key — see CsrfTokenService).
+    builder.Services
+        .AddOptions<CsrfOptions>()
+        .Bind(builder.Configuration.GetSection(CsrfOptions.SectionName))
+        .Validate(
+            o => !string.IsNullOrWhiteSpace(o.Key) && o.Key.Length >= 32,
+            "Csrf:Key must be configured with at least 32 characters (User Secrets / Key Vault).")
+        .ValidateOnStart();
     builder.Services.Configure<AuthSettings>(builder.Configuration.GetSection(AuthSettings.SectionName));
     builder.Services.Configure<DefaultAdminOptions>(builder.Configuration.GetSection(DefaultAdminOptions.SectionName));
 
@@ -258,6 +266,14 @@ try
     // named origins (a wildcard is illegal with credentials) + AllowCredentials.
     string[] corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? Array.Empty<string>();
+    if (corsOrigins.Length == 0)
+    {
+        // Fail-closed (WithOrigins([]) blocks all cross-origin SPA calls) — but unlike
+        // the Jwt:Key fail-fast there is no hard error, so warn to shorten "CORS blocked"
+        // debugging when an environment is missing Cors:AllowedOrigins.
+        Log.Warning("CORS: no allowed origins configured (Cors:AllowedOrigins is empty) — cross-origin SPA calls will be blocked.");
+    }
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("spa", policy => policy
@@ -375,6 +391,30 @@ try
 
     // 1. ExceptionMiddleware first — its try wraps everything downstream.
     app.UseMiddleware<ExceptionMiddleware>();
+
+    // 1b. Baseline security response headers (defense-in-depth). This is a JSON API
+    //     + a separate SPA, so these are hardening rather than load-bearing, but their
+    //     presence is the canonical baseline and they also cover Swagger/error/blob
+    //     responses. Set right after ExceptionMiddleware so even error responses carry them.
+    app.Use(async (context, next) =>
+    {
+        IHeaderDictionary headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        // Strict default for a pure JSON API — it renders no HTML of its own.
+        headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+        await next();
+    });
+
+    // 1c. HSTS outside Development. TLS is terminated at the APIM/Container Apps edge
+    //     in prod (so UseHttpsRedirection would be a no-op behind the proxy and is
+    //     intentionally omitted), but emitting Strict-Transport-Security instructs
+    //     browsers to refuse plaintext on subsequent visits — the half that still has merit.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
 
     // 2. Serilog request logging — one structured log line per request with
     //    method, path, status, elapsed ms. Sits after ExceptionMiddleware so

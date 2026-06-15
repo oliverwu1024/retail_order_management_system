@@ -17,12 +17,17 @@ public static class AuthCookies
             token,
             BuildOptions(httpOnly: true, secure, expiresAt));
 
-    /// <summary>Writes the refresh-token cookie: HttpOnly, longer-lived than the access cookie.</summary>
+    // Only /auth/refresh and /auth/logout ever read the refresh token, so it is scoped
+    // to that path (least privilege) rather than sent on every API request like the
+    // access/csrf cookies. Clear() must delete it with the SAME path to match.
+    private const string RefreshTokenPath = "/api/v1/auth";
+
+    /// <summary>Writes the refresh-token cookie: HttpOnly, longer-lived, scoped to the auth endpoints.</summary>
     public static void WriteRefreshToken(HttpResponse response, string token, DateTimeOffset expiresAt, bool secure) =>
         response.Cookies.Append(
             AuthConstants.RefreshTokenCookie,
             token,
-            BuildOptions(httpOnly: true, secure, expiresAt));
+            BuildOptions(httpOnly: true, secure, expiresAt, path: RefreshTokenPath));
 
     /// <summary>
     /// Writes the CSRF cookie: NON-HttpOnly on purpose, so the SPA can read it and
@@ -42,24 +47,25 @@ public static class AuthCookies
     /// </summary>
     public static void Clear(HttpResponse response, bool secure)
     {
-        var options = new CookieOptions
+        CookieOptions Delete(string path) => new()
         {
             Secure = secure,
             SameSite = SameSiteMode.Strict,
-            Path = "/",
+            Path = path,
         };
 
-        response.Cookies.Delete(AuthConstants.AccessTokenCookie, options);
-        response.Cookies.Delete(AuthConstants.RefreshTokenCookie, options);
-        response.Cookies.Delete(AuthConstants.CsrfCookie, options);
+        response.Cookies.Delete(AuthConstants.AccessTokenCookie, Delete("/"));
+        // Must match the narrowed write path or the browser won't remove it.
+        response.Cookies.Delete(AuthConstants.RefreshTokenCookie, Delete(RefreshTokenPath));
+        response.Cookies.Delete(AuthConstants.CsrfCookie, Delete("/"));
     }
 
-    private static CookieOptions BuildOptions(bool httpOnly, bool secure, DateTimeOffset? expiresAt) => new()
+    private static CookieOptions BuildOptions(bool httpOnly, bool secure, DateTimeOffset? expiresAt, string path = "/") => new()
     {
         HttpOnly = httpOnly,
         Secure = secure,
         SameSite = SameSiteMode.Strict,
-        Path = "/",
+        Path = path,
         Expires = expiresAt,
         // Marks the cookie as required for the app to function, so it is not
         // suppressed by ASP.NET Core's cookie-consent (GDPR) gate.

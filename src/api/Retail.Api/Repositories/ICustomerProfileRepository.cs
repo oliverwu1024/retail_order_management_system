@@ -36,12 +36,13 @@ public interface ICustomerProfileRepository
     /// <summary>
     /// Clears <c>IsDefaultShipping</c> on the profile's addresses (optionally except one)
     /// via a single set-based UPDATE. Run before setting a new default so the filtered
-    /// unique index never sees two defaults at once.
+    /// unique index never sees two defaults at once. Stamps the audit fields itself, since
+    /// <c>ExecuteUpdate</c> bypasses the SaveChanges-based AuditingInterceptor.
     /// </summary>
-    Task ClearDefaultShippingAsync(Guid profileId, Guid? exceptAddressId, CancellationToken ct);
+    Task ClearDefaultShippingAsync(Guid profileId, Guid? exceptAddressId, DateTimeOffset updatedAt, string? updatedBy, CancellationToken ct);
 
     /// <summary>Billing twin of <see cref="ClearDefaultShippingAsync"/>.</summary>
-    Task ClearDefaultBillingAsync(Guid profileId, Guid? exceptAddressId, CancellationToken ct);
+    Task ClearDefaultBillingAsync(Guid profileId, Guid? exceptAddressId, DateTimeOffset updatedAt, string? updatedBy, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
 }

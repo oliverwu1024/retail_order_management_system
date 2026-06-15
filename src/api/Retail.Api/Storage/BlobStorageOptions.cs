@@ -15,4 +15,11 @@ public sealed class BlobStorageOptions
 
     /// <summary>Container that holds product images (DATABASE_DESIGN §3.5).</summary>
     public string ProductImagesContainer { get; set; } = "product-images";
+
+    /// <summary>
+    /// Whether the product-images container is created with anonymous public-read access.
+    /// Default <c>false</c> (private) so production stays private by default; dev/Azurite
+    /// sets it <c>true</c> so the storefront can fetch images by direct URL.
+    /// </summary>
+    public bool PublicReadImages { get; set; }
 }

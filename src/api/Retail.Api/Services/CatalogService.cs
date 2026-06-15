@@ -46,7 +46,7 @@ public sealed class CatalogService : ICatalogService
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         (IReadOnlyList<Product> items, int total) =
-            await _products.ListPublishedAsync(query.CategoryId, query.Search, page, pageSize, ct);
+            await _products.ListPublishedAsync(query.CategoryId, NormalizeSearch(query.Search), page, pageSize, ct);
 
         List<ProductSummaryDto> dtos = items.Select(p => p.ToSummaryDto()).ToList();
         return new PagedResult<ProductSummaryDto>(dtos, total, page, pageSize);
@@ -74,7 +74,7 @@ public sealed class CatalogService : ICatalogService
         int pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);
 
         (IReadOnlyList<Product> items, int total) =
-            await _products.ListForAdminAsync(query.CategoryId, query.Search, page, pageSize, ct);
+            await _products.ListForAdminAsync(query.CategoryId, NormalizeSearch(query.Search), page, pageSize, ct);
 
         List<ProductSummaryDto> dtos = items.Select(p => p.ToSummaryDto()).ToList();
         return new PagedResult<ProductSummaryDto>(dtos, total, page, pageSize);
@@ -197,13 +197,28 @@ public sealed class CatalogService : ICatalogService
         Product product = await _products.GetByIdForWriteAsync(id, ct)
             ?? throw new NotFoundException($"Product '{id}' was not found.");
 
-        // Unique key per upload (no overwrite); old blobs are left for a later cleanup job.
+        // Unique key per upload (no overwrite). Remember the previous key so we can clean it up.
+        string? previousKey = product.PrimaryImageBlobKey;
         string extension = ProductImage.ExtensionFor(contentType);
         string blobKey = $"products/{product.Id:N}/{Guid.NewGuid():N}.{extension}";
         await _blob.UploadAsync(_storage.ProductImagesContainer, blobKey, content, contentType, ct);
 
         product.PrimaryImageBlobKey = blobKey;
         await _products.SaveChangesAsync(ct);
+
+        // Best-effort delete the superseded blob AFTER the pointer is committed, so a delete
+        // failure never leaves a dangling DB reference. Don't let cleanup fail the request.
+        if (previousKey is not null)
+        {
+            try
+            {
+                await _blob.DeleteAsync(_storage.ProductImagesContainer, previousKey, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete superseded image {BlobKey} for product {ProductId}", previousKey, product.Id);
+            }
+        }
 
         _logger.LogInformation("Set primary image for product {ProductId} -> {BlobKey}", product.Id, blobKey);
         return product.ToDetailDto();
@@ -317,6 +332,17 @@ public sealed class CatalogService : ICatalogService
 
             cursor = node.ParentId;
         }
+    }
+
+    // Search runs as a non-sargable LIKE '%term%' (full scan) on a public endpoint, so
+    // drop 1-char terms to avoid scanning the whole table on a near-empty query. For a
+    // large catalogue this should move to SQL Server full-text search (CONTAINS).
+    private const int MinSearchLength = 2;
+
+    private static string? NormalizeSearch(string? search)
+    {
+        string trimmed = (search ?? string.Empty).Trim();
+        return trimmed.Length >= MinSearchLength ? trimmed : null;
     }
 
     private static string ResolveSlug(string? requested, string fallbackSource)

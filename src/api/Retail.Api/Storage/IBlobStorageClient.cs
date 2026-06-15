@@ -8,9 +8,12 @@ public interface IBlobStorageClient
 {
     /// <summary>
     /// Uploads <paramref name="content"/> to <paramref name="blobName"/> in
-    /// <paramref name="container"/> (created with public-blob read access if absent),
-    /// tagging it with <paramref name="contentType"/>. Returns the blob key (the path
-    /// within the container) to persist on the entity.
+    /// <paramref name="container"/> (created if absent; public-read only when
+    /// <c>Storage:PublicReadImages</c> is set), tagging it with <paramref name="contentType"/>.
+    /// Returns the blob key (the path within the container) to persist on the entity.
     /// </summary>
     Task<string> UploadAsync(string container, string blobName, Stream content, string contentType, CancellationToken ct);
+
+    /// <summary>Best-effort delete of a blob (no-op if it doesn't exist). Used to clean up superseded images.</summary>
+    Task DeleteAsync(string container, string blobName, CancellationToken ct);
 }

@@ -201,6 +201,6 @@ public class ExceptionMiddleware
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/json; charset=utf-8";
 
-        await JsonSerializer.SerializeAsync(context.Response.Body, envelope, JsonOptions);
+        await JsonSerializer.SerializeAsync(context.Response.Body, envelope, JsonOptions, context.RequestAborted);
     }
 }

@@ -27,6 +27,13 @@ public sealed class AuthService : IAuthService
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<AuthService> _logger;
 
+    // A precomputed Identity password hash. Verifying a supplied password against it on
+    // the unknown-email login branch burns an equivalent PBKDF2, so the response time of
+    // "no such account" matches "wrong password" — closing the login timing enumeration
+    // oracle (an attacker can't tell registered emails apart by latency).
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<ApplicationUser>().HashPassword(new ApplicationUser(), "timing-equalizer");
+
     public AuthService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
@@ -48,8 +55,13 @@ public sealed class AuthService : IAuthService
     /// <inheritdoc />
     public async Task<AuthResult> RegisterAsync(RegisterRequest request, CancellationToken ct)
     {
-        // Pre-check for a friendly "email taken" rather than a raw Identity error.
-        // (Identity still enforces uniqueness at insert, closing the check-then-act race.)
+        // SECURITY TRADEOFF (intentional): we disclose "email already registered" for UX.
+        // This makes /register an account-enumeration oracle — the conventional choice most
+        // signup flows accept. Login (LoginAsync) is deliberately NON-enumerable (uniform
+        // InvalidCredentials + equalized timing). The hardened alternative (a generic
+        // "check your inbox" response + out-of-band notice to the existing user) is deferred
+        // until a transactional-email pipeline exists. (Identity also enforces uniqueness at
+        // insert, closing the check-then-act race.)
         ApplicationUser? existing = await _userManager.FindByEmailAsync(request.Email);
         if (existing is not null)
         {
@@ -83,7 +95,10 @@ public sealed class AuthService : IAuthService
         ApplicationUser? user = await _userManager.FindByEmailAsync(request.Email);
         if (user is null)
         {
+            // Burn an equivalent PBKDF2 verification so the unknown-email path costs the
+            // same as a wrong-password path — closes the login timing enumeration oracle.
             // Same message + kind as a wrong password — never reveal which.
+            _ = _userManager.PasswordHasher.VerifyHashedPassword(new ApplicationUser(), DummyPasswordHash, request.Password);
             return AuthResult.Fail(AuthError.InvalidCredentials, "Invalid email or password.");
         }
 
@@ -159,6 +174,11 @@ public sealed class AuthService : IAuthService
         }
 
         // Valid + active → rotate: issue a successor and revoke this one, linked.
+        // NOTE (single-flight assumption): rotation is read-then-write without a
+        // concurrency token, so two requests racing on the SAME token could each mint a
+        // successor. Browsers serialize refresh on the one HttpOnly cookie, so this can't
+        // happen from a normal client; hardening to a conditional/rowversion'd rotation is
+        // tracked as a follow-up.
         return await IssueTokensAsync(user, ct, replacing: stored);
     }
 

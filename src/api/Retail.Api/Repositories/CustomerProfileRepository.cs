@@ -52,7 +52,7 @@ public sealed class CustomerProfileRepository : ICustomerProfileRepository
         _db.Addresses.Remove(address);
 
     /// <inheritdoc />
-    public async Task ClearDefaultShippingAsync(Guid profileId, Guid? exceptAddressId, CancellationToken ct)
+    public async Task ClearDefaultShippingAsync(Guid profileId, Guid? exceptAddressId, DateTimeOffset updatedAt, string? updatedBy, CancellationToken ct)
     {
         IQueryable<Address> query = _db.Addresses
             .Where(a => a.CustomerProfileId == profileId && a.IsDefaultShipping);
@@ -63,11 +63,17 @@ public sealed class CustomerProfileRepository : ICustomerProfileRepository
         }
 
         // Set-based UPDATE issued immediately (participates in the ambient transaction).
-        await query.ExecuteUpdateAsync(s => s.SetProperty(a => a.IsDefaultShipping, false), ct);
+        // Stamp audit fields here — ExecuteUpdate doesn't run through the AuditingInterceptor.
+        await query.ExecuteUpdateAsync(
+            s => s
+                .SetProperty(a => a.IsDefaultShipping, false)
+                .SetProperty(a => a.UpdatedAt, updatedAt)
+                .SetProperty(a => a.UpdatedBy, updatedBy),
+            ct);
     }
 
     /// <inheritdoc />
-    public async Task ClearDefaultBillingAsync(Guid profileId, Guid? exceptAddressId, CancellationToken ct)
+    public async Task ClearDefaultBillingAsync(Guid profileId, Guid? exceptAddressId, DateTimeOffset updatedAt, string? updatedBy, CancellationToken ct)
     {
         IQueryable<Address> query = _db.Addresses
             .Where(a => a.CustomerProfileId == profileId && a.IsDefaultBilling);
@@ -77,7 +83,12 @@ public sealed class CustomerProfileRepository : ICustomerProfileRepository
             query = query.Where(a => a.Id != except);
         }
 
-        await query.ExecuteUpdateAsync(s => s.SetProperty(a => a.IsDefaultBilling, false), ct);
+        await query.ExecuteUpdateAsync(
+            s => s
+                .SetProperty(a => a.IsDefaultBilling, false)
+                .SetProperty(a => a.UpdatedAt, updatedAt)
+                .SetProperty(a => a.UpdatedBy, updatedBy),
+            ct);
     }
 
     /// <inheritdoc />

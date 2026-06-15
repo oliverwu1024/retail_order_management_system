@@ -161,8 +161,12 @@ public sealed class CatalogController : ControllerBase
     }
 
     /// <summary>Uploads/replaces a product's primary image (jpg/png/webp, ≤5 MB) → Blob (Task 1.2.8).</summary>
+    // RequestSizeLimit/RequestFormLimits reject an oversized body at the framework edge,
+    // BEFORE model binding buffers it — so the 5 MB cap isn't only enforced post-buffer.
     [HttpPost("products/{id:guid}/image")]
     [Authorize(Roles = Roles.Administrator)]
+    [RequestSizeLimit(ProductImage.MaxBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ProductImage.MaxBytes)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UploadProductImage(Guid id, IFormFile file, CancellationToken ct)
@@ -177,13 +181,24 @@ public sealed class CatalogController : ControllerBase
             return UnprocessableEntity(ApiResponse.Fail($"Image exceeds the {ProductImage.MaxBytes / (1024 * 1024)} MB limit."));
         }
 
+        // Fast early reject on an obviously-wrong declared type, but the AUTHORITATIVE
+        // format check is the magic-byte sniff below — the client Content-Type is spoofable.
         if (!ProductImage.IsAllowedContentType(file.ContentType))
         {
             return UnprocessableEntity(ApiResponse.Fail("Only JPEG, PNG, or WebP images are allowed."));
         }
 
         await using Stream stream = file.OpenReadStream();
-        ProductDetailDto product = await _catalog.SetProductPrimaryImageAsync(id, stream, file.ContentType, ct);
+        byte[] header = new byte[12];
+        int read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false, ct);
+        if (!ProductImage.TryDetectContentType(header.AsSpan(0, read), out string detectedContentType))
+        {
+            return UnprocessableEntity(ApiResponse.Fail("The file is not a valid JPEG, PNG, or WebP image."));
+        }
+
+        // Rewind and store with the DETECTED type, never the client-declared one.
+        stream.Position = 0;
+        ProductDetailDto product = await _catalog.SetProductPrimaryImageAsync(id, stream, detectedContentType, ct);
         return Ok(ApiResponse<ProductDetailDto>.Ok(product));
     }
 

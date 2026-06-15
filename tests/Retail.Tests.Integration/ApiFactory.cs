@@ -83,6 +83,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 // Point the app's own UseSqlServer at the container — no DbContext swap.
                 ["ConnectionStrings:Default"] = _connectionString,
                 ["Jwt:Key"] = "integration-tests-signing-key-0123456789-abcdef",
+                ["Csrf:Key"] = "integration-tests-csrf-signing-key-0123456789-abcdef",
                 ["Jwt:Issuer"] = "https://localhost/test",
                 ["Jwt:Audience"] = "retail-oms-test",
                 ["Jwt:AccessTokenMinutes"] = "15",

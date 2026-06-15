@@ -20,18 +20,19 @@ namespace Retail.Api.Identity;
 /// double-submit and the framework's <c>IAntiforgery</c>.
 /// </para>
 /// <para>
-/// The HMAC key currently reuses <c>Jwt:Key</c> (already a ≥32-char server-only
-/// secret). A dedicated <c>Csrf:Key</c> can be introduced later without changing
-/// the wire format. Registered as a singleton (immutable after construction).
+/// The HMAC key is a DEDICATED <c>Csrf:Key</c> (≥32-char server-only secret),
+/// separate from <c>Jwt:Key</c> — key separation keeps the two cryptographic
+/// purposes independent (a leak/rotation of the JWT key doesn't force CSRF rotation,
+/// and vice versa). Registered as a singleton (immutable after construction).
 /// </para>
 /// </remarks>
 public sealed class CsrfTokenService : ICsrfTokenService
 {
     private readonly byte[] _key;
 
-    public CsrfTokenService(IOptions<JwtOptions> jwtOptions)
+    public CsrfTokenService(IOptions<CsrfOptions> csrfOptions)
     {
-        _key = Encoding.UTF8.GetBytes(jwtOptions.Value.Key);
+        _key = Encoding.UTF8.GetBytes(csrfOptions.Value.Key);
     }
 
     /// <inheritdoc />

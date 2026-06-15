@@ -11,7 +11,7 @@ namespace Retail.Tests.Unit.Identity;
 public class CsrfTokenServiceTests
 {
     private static CsrfTokenService NewService(string key = "csrf-test-key-0123456789-abcdefghijkl") =>
-        new(Options.Create(new JwtOptions { Key = key }));
+        new(Options.Create(new CsrfOptions { Key = key }));
 
     [Fact]
     public void IssueThenValidate_RoundTrips()

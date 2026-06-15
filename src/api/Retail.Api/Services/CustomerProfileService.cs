@@ -34,15 +34,18 @@ public sealed class CustomerProfileService : ICustomerProfileService
 {
     private readonly ICustomerProfileRepository _repo;
     private readonly RetailDbContext _db; // for transactions only (CODING_STANDARDS-sanctioned)
+    private readonly TimeProvider _timeProvider; // to audit-stamp the set-based default-clear
     private readonly ILogger<CustomerProfileService> _logger;
 
     public CustomerProfileService(
         ICustomerProfileRepository repo,
         RetailDbContext db,
+        TimeProvider timeProvider,
         ILogger<CustomerProfileService> logger)
     {
         _repo = repo;
         _db = db;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -101,8 +104,11 @@ public sealed class CustomerProfileService : ICustomerProfileService
         var address = new Address { CustomerProfileId = profile.Id };
         ApplyAddressFields(address, request);
 
+        // Always transactional for one simple, uniform path — the clear-then-set is only
+        // load-bearing when a default flag is set, but the no-op-clear case costs a trivial
+        // BEGIN/COMMIT and keeps the code easy to reason about.
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        await ClearSupersededDefaultsAsync(profile.Id, exceptAddressId: null, request, ct);
+        await ClearSupersededDefaultsAsync(profile.Id, exceptAddressId: null, request, appUserId, ct);
         await _repo.AddAddressAsync(address, ct);
         await SaveDefaultChangeAsync(tx, ct);
 
@@ -121,7 +127,7 @@ public sealed class CustomerProfileService : ICustomerProfileService
         ApplyAddressFields(address, request);
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        await ClearSupersededDefaultsAsync(address.CustomerProfileId, exceptAddressId: addressId, request, ct);
+        await ClearSupersededDefaultsAsync(address.CustomerProfileId, exceptAddressId: addressId, request, appUserId, ct);
         await SaveDefaultChangeAsync(tx, ct);
 
         _logger.LogInformation("Address {AddressId} updated.", addressId);
@@ -202,17 +208,21 @@ public sealed class CustomerProfileService : ICustomerProfileService
     }
 
     // Clears the prior default(s) the incoming request is about to supersede, so the
-    // filtered unique index never sees two defaults for the same axis.
-    private async Task ClearSupersededDefaultsAsync(Guid profileId, Guid? exceptAddressId, AddressRequest request, CancellationToken ct)
+    // filtered unique index never sees two defaults for the same axis. The set-based
+    // clear bypasses the AuditingInterceptor, so we stamp UpdatedAt/UpdatedBy ourselves
+    // (actor = the acting user, matching what the interceptor would record).
+    private async Task ClearSupersededDefaultsAsync(Guid profileId, Guid? exceptAddressId, AddressRequest request, string actorUserId, CancellationToken ct)
     {
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+
         if (request.IsDefaultShipping)
         {
-            await _repo.ClearDefaultShippingAsync(profileId, exceptAddressId, ct);
+            await _repo.ClearDefaultShippingAsync(profileId, exceptAddressId, now, actorUserId, ct);
         }
 
         if (request.IsDefaultBilling)
         {
-            await _repo.ClearDefaultBillingAsync(profileId, exceptAddressId, ct);
+            await _repo.ClearDefaultBillingAsync(profileId, exceptAddressId, now, actorUserId, ct);
         }
     }
 
