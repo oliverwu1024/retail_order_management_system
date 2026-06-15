@@ -37,7 +37,7 @@ const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 function readCookie(name: string): string | null {
   // document.cookie is "k1=v1; k2=v2" — parse for our specific key.
   // Returns null when the cookie isn't set (e.g., first page load before
-  // the backend has issued an XSRF-TOKEN).
+  // the backend has issued the `csrf` cookie via GET /auth/csrf).
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
   return match ? decodeURIComponent(match[1]) : null
 }
@@ -46,9 +46,13 @@ const csrfMiddleware: Middleware = {
   async onRequest({ request }) {
     if (STATE_CHANGING_METHODS.has(request.method.toUpperCase())) {
       const token = readCookie('csrf')
-      if (token) {
-        request.headers.set('X-CSRF-Token', token)
+      if (!token) {
+        // No CSRF cookie → the backend would 403 this anyway. Fail fast with a
+        // diagnosable client error instead of firing a guaranteed-403 round-trip;
+        // the UI maps this to a "refresh the page and try again" message.
+        throw new Error('Missing CSRF token — please refresh the page and try again.')
       }
+      request.headers.set('X-CSRF-Token', token)
     }
     return request
   },

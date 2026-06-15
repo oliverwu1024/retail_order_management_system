@@ -36,9 +36,12 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Administrator-only: the backend admin catalog endpoints are Administrator-only,
+        // so the whole /admin surface is scoped to match (no StoreManager dead-end until
+        // the Phase 3 RBAC matrix gives StoreManager its own backed endpoints).
         path: '/admin',
         element: (
-          <RoleGuard allowedRoles={['Administrator', 'StoreManager']}>
+          <RoleGuard allowedRoles={['Administrator']}>
             <AdminHomePage />
           </RoleGuard>
         ),

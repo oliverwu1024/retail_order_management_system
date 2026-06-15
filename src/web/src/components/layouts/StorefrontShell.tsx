@@ -4,7 +4,9 @@ import { applyAuthUser } from '@/features/auth/session'
 import { apiClient } from '@/lib/api/client'
 import { useAuthStore } from '@/lib/store/auth-store'
 
-const ADMIN_ROLES = ['Administrator', 'StoreManager']
+// Administrator-only for now — matches the Administrator-only backend admin endpoints
+// (StoreManager gets backed admin routes when the Phase 3 RBAC matrix lands).
+const ADMIN_ROLES = ['Administrator']
 
 /** Storefront layout: auth-aware header + routed content (React Router layout route). */
 export function StorefrontShell() {
