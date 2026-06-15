@@ -27,7 +27,14 @@
 #  the volume from.
 # ─────────────────────────────────────────────────────────────────────────────
 
-FROM node:20-alpine
+FROM node:22-alpine
+
+# NOTE: this image intentionally runs as root (no USER directive), unlike the API
+# image which drops to a non-root user. It is a DEV-ONLY image — production web ships
+# to Azure Static Web Apps (no container), the source is bind-mounted, and no prod
+# artifact or secret is built here, so the blast radius is minimal. Adding `USER node`
+# naively breaks Vite because compose bind-mounts the host-owned source + an anonymous
+# root-owned node_modules volume over /app; left as-is deliberately.
 
 # Enable corepack (pnpm-via-corepack works without a global npm install).
 RUN corepack enable

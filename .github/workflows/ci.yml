@@ -33,6 +33,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: this build-and-test workflow only reads the repo (it runs on
+# PRs from forks and holds no deployment secrets). Caps GITHUB_TOKEN to read-only
+# regardless of the repo/org default.
+permissions:
+  contents: read
+
 jobs:
   # ───────────────────────────────────────────────────────────────────────────
   # Backend · ASP.NET Core API
@@ -41,10 +47,10 @@ jobs:
     name: API · build + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5
         with:
           dotnet-version: '10.0.x'
 
@@ -52,7 +58,7 @@ jobs:
       # The cache key includes every csproj hash so a dependency change
       # busts the cache cleanly.
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props') }}
@@ -75,7 +81,7 @@ jobs:
         # Always upload, even on failure, so the .trx is available for
         # post-mortem in the GitHub Actions UI.
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: api-test-results
           path: '**/TestResults/*.trx'
@@ -91,21 +97,21 @@ jobs:
       run:
         working-directory: src/web
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up pnpm
         # pnpm/action-setup installs the version pinned in package.json's
         # `packageManager` field (or a fallback). Setting up pnpm BEFORE
         # setup-node lets setup-node's cache-key resolution find the
         # right store path.
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
         with:
           version: 10
 
-      - name: Set up Node 20
-        uses: actions/setup-node@v6
+      - name: Set up Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: src/web/pnpm-lock.yaml
 
@@ -134,7 +140,7 @@ jobs:
     name: Bicep · build (syntax check)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       # `az` is preinstalled on ubuntu-latest; `az bicep install` is
       # idempotent + fast (downloads the bicep CLI into the az cache).

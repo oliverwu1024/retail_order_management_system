@@ -1,0 +1,12 @@
+version: 2
+
+# Keeps the SHA-pinned GitHub Actions fresh: Dependabot opens weekly PRs that bump
+# each pinned commit SHA (and updates the trailing version comment), so pinning for
+# supply-chain safety doesn't mean the actions silently go stale.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
