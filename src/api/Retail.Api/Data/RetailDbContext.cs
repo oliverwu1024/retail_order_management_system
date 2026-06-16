@@ -72,6 +72,9 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Purchasable product variants (price + options + stock).</summary>
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
 
+    /// <summary>Product gallery images (general + variant-specific).</summary>
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
+
     /// <summary>Per-variant stock (1:1 with <see cref="ProductVariant"/>).</summary>
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
 

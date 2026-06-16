@@ -25,7 +25,17 @@ public interface ICatalogService
     Task<ProductDetailDto> CreateProductAsync(CreateProductRequest request, CancellationToken ct);
     Task<ProductDetailDto> UpdateProductAsync(Guid id, UpdateProductRequest request, CancellationToken ct);
     Task SoftDeleteProductAsync(Guid id, CancellationToken ct);
-    Task<ProductDetailDto> SetProductPrimaryImageAsync(Guid id, Stream content, string contentType, CancellationToken ct);
+
+    // ── Product image gallery (PRODUCT_IMAGES_SCOPE) ──────────────────────────
+    /// <summary>Adds an image to the gallery (becomes primary if the product has none yet). Optional variant scoping + alt text. Returns the updated product detail.</summary>
+    Task<ProductDetailDto> AddProductImageAsync(Guid productId, Stream content, string contentType, Guid? variantId, string? altText, CancellationToken ct);
+    /// <summary>Deletes a gallery image (promotes the next image to primary if the deleted one was primary).</summary>
+    Task<ProductDetailDto> DeleteProductImageAsync(Guid productId, Guid imageId, CancellationToken ct);
+    /// <summary>Reassigns SortOrder to the product's images from the supplied full ordering.</summary>
+    Task<ProductDetailDto> ReorderProductImagesAsync(Guid productId, IReadOnlyList<Guid> imageIds, CancellationToken ct);
+    /// <summary>Edits a gallery image (alt text, variant association, promote-to-primary).</summary>
+    Task<ProductDetailDto> UpdateProductImageAsync(Guid productId, Guid imageId, UpdateProductImageRequest request, CancellationToken ct);
+
     Task<ProductVariantDto> AddVariantAsync(Guid productId, CreateVariantRequest request, CancellationToken ct);
     Task<ProductVariantDto> UpdateVariantAsync(Guid productId, Guid variantId, UpdateVariantRequest request, CancellationToken ct);
     Task DeleteVariantAsync(Guid productId, Guid variantId, CancellationToken ct);

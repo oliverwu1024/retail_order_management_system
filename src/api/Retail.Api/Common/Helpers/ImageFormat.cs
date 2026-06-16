@@ -3,9 +3,10 @@ namespace Retail.Api.Common.Helpers;
 /// <summary>
 /// Rules for product-image uploads (REQUIREMENTS §2.2): the accepted content types
 /// (jpg/png/webp) and the size cap, plus the content-type → file-extension mapping
-/// used when naming the blob.
+/// used when naming the blob. (Renamed from <c>ProductImage</c> so that name is free for the
+/// <see cref="Domain.Entities.ProductImage"/> gallery entity.)
 /// </summary>
-public static class ProductImage
+public static class ImageFormat
 {
     /// <summary>Maximum accepted upload size (5 MB).</summary>
     public const long MaxBytes = 5 * 1024 * 1024;

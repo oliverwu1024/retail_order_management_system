@@ -160,45 +160,90 @@ public sealed class CatalogController : ControllerBase
         return Ok(ApiResponse.Ok("Product deleted."));
     }
 
-    /// <summary>Uploads/replaces a product's primary image (jpg/png/webp, ≤5 MB) → Blob (Task 1.2.8).</summary>
+    /// <summary>
+    /// Adds an image to a product's gallery (jpg/png/webp, ≤5 MB) → Blob. Optional <c>variantId</c>
+    /// (variant-specific image) + <c>altText</c> form fields. First image becomes the primary.
+    /// </summary>
     // RequestSizeLimit/RequestFormLimits reject an oversized body at the framework edge,
     // BEFORE model binding buffers it — so the 5 MB cap isn't only enforced post-buffer.
+    [HttpPost("products/{id:guid}/images")]
+    [Authorize(Roles = Roles.Administrator)]
+    [RequestSizeLimit(ImageFormat.MaxBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ImageFormat.MaxBytes)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> AddProductImage(
+        Guid id, IFormFile file, [FromForm] Guid? variantId, [FromForm] string? altText, CancellationToken ct)
+    {
+        (IActionResult? error, Stream? stream, string contentType) = await ValidateImageUploadAsync(file, ct);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        await using (stream!)
+        {
+            ProductDetailDto product = await _catalog.AddProductImageAsync(id, stream!, contentType, variantId, altText, ct);
+            return Ok(ApiResponse<ProductDetailDto>.Ok(product));
+        }
+    }
+
+    /// <summary>
+    /// Back-compat: uploads a single general image (becomes primary if first). Superseded by
+    /// <c>POST .../images</c>; kept so the existing admin upload keeps working during the gallery
+    /// rollout.
+    /// </summary>
     [HttpPost("products/{id:guid}/image")]
     [Authorize(Roles = Roles.Administrator)]
-    [RequestSizeLimit(ProductImage.MaxBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = ProductImage.MaxBytes)]
+    [RequestSizeLimit(ImageFormat.MaxBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ImageFormat.MaxBytes)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UploadProductImage(Guid id, IFormFile file, CancellationToken ct)
     {
-        if (file is null || file.Length == 0)
+        (IActionResult? error, Stream? stream, string contentType) = await ValidateImageUploadAsync(file, ct);
+        if (error is not null)
         {
-            return UnprocessableEntity(ApiResponse.Fail("An image file is required."));
+            return error;
         }
 
-        if (file.Length > ProductImage.MaxBytes)
+        await using (stream!)
         {
-            return UnprocessableEntity(ApiResponse.Fail($"Image exceeds the {ProductImage.MaxBytes / (1024 * 1024)} MB limit."));
+            ProductDetailDto product = await _catalog.AddProductImageAsync(id, stream!, contentType, variantId: null, altText: null, ct);
+            return Ok(ApiResponse<ProductDetailDto>.Ok(product));
         }
+    }
 
-        // Fast early reject on an obviously-wrong declared type, but the AUTHORITATIVE
-        // format check is the magic-byte sniff below — the client Content-Type is spoofable.
-        if (!ProductImage.IsAllowedContentType(file.ContentType))
-        {
-            return UnprocessableEntity(ApiResponse.Fail("Only JPEG, PNG, or WebP images are allowed."));
-        }
+    /// <summary>Reorders a product's gallery (body = the full set of image ids in display order).</summary>
+    [HttpPut("products/{id:guid}/images/order")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> ReorderProductImages(Guid id, [FromBody] ReorderProductImagesRequest request, CancellationToken ct)
+    {
+        ProductDetailDto product = await _catalog.ReorderProductImagesAsync(id, request.ImageIds ?? new List<Guid>(), ct);
+        return Ok(ApiResponse<ProductDetailDto>.Ok(product));
+    }
 
-        await using Stream stream = file.OpenReadStream();
-        byte[] header = new byte[12];
-        int read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false, ct);
-        if (!ProductImage.TryDetectContentType(header.AsSpan(0, read), out string detectedContentType))
-        {
-            return UnprocessableEntity(ApiResponse.Fail("The file is not a valid JPEG, PNG, or WebP image."));
-        }
+    /// <summary>Edits a gallery image (alt text, variant association, promote-to-primary).</summary>
+    [HttpPut("products/{id:guid}/images/{imageId:guid}")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateProductImage(Guid id, Guid imageId, [FromBody] UpdateProductImageRequest request, CancellationToken ct)
+    {
+        ProductDetailDto product = await _catalog.UpdateProductImageAsync(id, imageId, request, ct);
+        return Ok(ApiResponse<ProductDetailDto>.Ok(product));
+    }
 
-        // Rewind and store with the DETECTED type, never the client-declared one.
-        stream.Position = 0;
-        ProductDetailDto product = await _catalog.SetProductPrimaryImageAsync(id, stream, detectedContentType, ct);
+    /// <summary>Deletes a gallery image (promotes the next image to primary if it was the primary).</summary>
+    [HttpDelete("products/{id:guid}/images/{imageId:guid}")]
+    [Authorize(Roles = Roles.Administrator)]
+    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteProductImage(Guid id, Guid imageId, CancellationToken ct)
+    {
+        ProductDetailDto product = await _catalog.DeleteProductImageAsync(id, imageId, ct);
         return Ok(ApiResponse<ProductDetailDto>.Ok(product));
     }
 
@@ -243,6 +288,42 @@ public sealed class CatalogController : ControllerBase
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────
+
+    // Validates an uploaded image (size + the spoofable-content-type guard via a magic-byte sniff).
+    // On success returns the stream rewound to 0 plus the DETECTED content type (never the
+    // client-declared one); on failure returns a 422 in Error and disposes the stream.
+    private async Task<(IActionResult? Error, Stream? Stream, string ContentType)> ValidateImageUploadAsync(
+        IFormFile? file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return (UnprocessableEntity(ApiResponse.Fail("An image file is required.")), null, string.Empty);
+        }
+
+        if (file.Length > ImageFormat.MaxBytes)
+        {
+            return (UnprocessableEntity(ApiResponse.Fail($"Image exceeds the {ImageFormat.MaxBytes / (1024 * 1024)} MB limit.")), null, string.Empty);
+        }
+
+        // Fast early reject on an obviously-wrong declared type, but the AUTHORITATIVE check is
+        // the magic-byte sniff below — the client Content-Type is spoofable.
+        if (!ImageFormat.IsAllowedContentType(file.ContentType))
+        {
+            return (UnprocessableEntity(ApiResponse.Fail("Only JPEG, PNG, or WebP images are allowed.")), null, string.Empty);
+        }
+
+        Stream stream = file.OpenReadStream();
+        byte[] header = new byte[12];
+        int read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false, ct);
+        if (!ImageFormat.TryDetectContentType(header.AsSpan(0, read), out string detectedContentType))
+        {
+            await stream.DisposeAsync();
+            return (UnprocessableEntity(ApiResponse.Fail("The file is not a valid JPEG, PNG, or WebP image.")), null, string.Empty);
+        }
+
+        stream.Position = 0;
+        return (null, stream, detectedContentType);
+    }
 
     // Runs the validator; returns a 422 result if invalid, or null to continue.
     private async Task<IActionResult?> ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken ct)

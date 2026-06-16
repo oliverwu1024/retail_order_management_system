@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Retail.Api.Common.Helpers;
 using Retail.Api.Common.Models;
+using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
@@ -21,6 +23,9 @@ public sealed class CatalogService : ICatalogService
     private readonly ICategoryRepository _categories;
     private readonly IBlobStorageClient _blob;
     private readonly BlobStorageOptions _storage;
+    // Same scoped instance the repositories use — only for the image-primary swap transaction
+    // (clear-then-set, so the filtered-unique primary index is never transiently violated).
+    private readonly RetailDbContext _db;
     private readonly ILogger<CatalogService> _logger;
 
     public CatalogService(
@@ -28,12 +33,14 @@ public sealed class CatalogService : ICatalogService
         ICategoryRepository categories,
         IBlobStorageClient blob,
         IOptions<BlobStorageOptions> storage,
+        RetailDbContext db,
         ILogger<CatalogService> logger)
     {
         _products = products;
         _categories = categories;
         _blob = blob;
         _storage = storage.Value;
+        _db = db;
         _logger = logger;
     }
 
@@ -192,36 +199,160 @@ public sealed class CatalogService : ICatalogService
     }
 
     /// <inheritdoc />
-    public async Task<ProductDetailDto> SetProductPrimaryImageAsync(Guid id, Stream content, string contentType, CancellationToken ct)
+    public async Task<ProductDetailDto> AddProductImageAsync(
+        Guid productId, Stream content, string contentType, Guid? variantId, string? altText, CancellationToken ct)
     {
-        Product product = await _products.GetByIdForWriteAsync(id, ct)
-            ?? throw new NotFoundException($"Product '{id}' was not found.");
+        Product product = await _products.GetByIdForWriteAsync(productId, ct)
+            ?? throw new NotFoundException($"Product '{productId}' was not found.");
 
-        // Unique key per upload (no overwrite). Remember the previous key so we can clean it up.
-        string? previousKey = product.PrimaryImageBlobKey;
-        string extension = ProductImage.ExtensionFor(contentType);
+        EnsureVariantOnProduct(product, variantId);
+
+        // Unique key per upload (no overwrite). Upload before the row so a failed upload never
+        // leaves a dangling DB pointer.
+        string extension = ImageFormat.ExtensionFor(contentType);
         string blobKey = $"products/{product.Id:N}/{Guid.NewGuid():N}.{extension}";
         await _blob.UploadAsync(_storage.ProductImagesContainer, blobKey, content, contentType, ct);
 
-        product.PrimaryImageBlobKey = blobKey;
-        await _products.SaveChangesAsync(ct);
+        // First image (or a gallery with no current primary) becomes the hero — no swap, so a
+        // single SaveChanges can't violate the one-primary index.
+        bool isPrimary = product.Images.All(i => !i.IsPrimary);
+        int nextSort = product.Images.Count == 0 ? 0 : product.Images.Max(i => i.SortOrder) + 1;
 
-        // Best-effort delete the superseded blob AFTER the pointer is committed, so a delete
-        // failure never leaves a dangling DB reference. Don't let cleanup fail the request.
-        if (previousKey is not null)
+        var image = new ProductImage
         {
-            try
-            {
-                await _blob.DeleteAsync(_storage.ProductImagesContainer, previousKey, ct);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to delete superseded image {BlobKey} for product {ProductId}", previousKey, product.Id);
-            }
+            ProductId = product.Id,
+            ProductVariantId = variantId,
+            BlobKey = blobKey,
+            AltText = altText,
+            SortOrder = nextSort,
+            IsPrimary = isPrimary,
+        };
+        product.Images.Add(image);
+        if (isPrimary)
+        {
+            product.PrimaryImageBlobKey = blobKey;
         }
 
-        _logger.LogInformation("Set primary image for product {ProductId} -> {BlobKey}", product.Id, blobKey);
+        await _products.SaveChangesAsync(ct);
+        _logger.LogInformation("Added image {ImageId} to product {ProductId} (primary={Primary})", image.Id, product.Id, isPrimary);
         return product.ToDetailDto();
+    }
+
+    /// <inheritdoc />
+    public async Task<ProductDetailDto> DeleteProductImageAsync(Guid productId, Guid imageId, CancellationToken ct)
+    {
+        Product product = await _products.GetByIdForWriteAsync(productId, ct)
+            ?? throw new NotFoundException($"Product '{productId}' was not found.");
+
+        ProductImage image = product.Images.FirstOrDefault(i => i.Id == imageId)
+            ?? throw new NotFoundException($"Image '{imageId}' was not found on product '{productId}'.");
+
+        string blobKey = image.BlobKey;
+        bool wasPrimary = image.IsPrimary;
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        // Delete the row FIRST (so the old primary is gone) before promoting a replacement —
+        // otherwise two IsPrimary rows would transiently violate UX_ProductImage_Primary.
+        product.Images.Remove(image);
+        await _products.SaveChangesAsync(ct);
+
+        if (wasPrimary)
+        {
+            ProductImage? next = product.Images.OrderBy(i => i.SortOrder).ThenBy(i => i.Id).FirstOrDefault();
+            product.PrimaryImageBlobKey = next?.BlobKey;
+            if (next is not null)
+            {
+                next.IsPrimary = true;
+            }
+            await _products.SaveChangesAsync(ct);
+        }
+
+        await tx.CommitAsync(ct);
+
+        // Best-effort blob cleanup AFTER commit, so a delete failure never leaves a dangling row.
+        try
+        {
+            await _blob.DeleteAsync(_storage.ProductImagesContainer, blobKey, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to delete image blob {BlobKey} for product {ProductId}", blobKey, product.Id);
+        }
+
+        _logger.LogInformation("Deleted image {ImageId} from product {ProductId}", imageId, product.Id);
+        return product.ToDetailDto();
+    }
+
+    /// <inheritdoc />
+    public async Task<ProductDetailDto> ReorderProductImagesAsync(Guid productId, IReadOnlyList<Guid> imageIds, CancellationToken ct)
+    {
+        Product product = await _products.GetByIdForWriteAsync(productId, ct)
+            ?? throw new NotFoundException($"Product '{productId}' was not found.");
+
+        // Require the full current set so SortOrder stays a dense, unambiguous 0..n-1.
+        HashSet<Guid> current = product.Images.Select(i => i.Id).ToHashSet();
+        if (imageIds.Count != current.Count || !imageIds.All(current.Contains))
+        {
+            throw new ConflictException("The reorder list must contain exactly the product's current image ids.");
+        }
+
+        for (int order = 0; order < imageIds.Count; order++)
+        {
+            product.Images.First(i => i.Id == imageIds[order]).SortOrder = order;
+        }
+
+        await _products.SaveChangesAsync(ct);
+        return product.ToDetailDto();
+    }
+
+    /// <inheritdoc />
+    public async Task<ProductDetailDto> UpdateProductImageAsync(
+        Guid productId, Guid imageId, UpdateProductImageRequest request, CancellationToken ct)
+    {
+        Product product = await _products.GetByIdForWriteAsync(productId, ct)
+            ?? throw new NotFoundException($"Product '{productId}' was not found.");
+
+        ProductImage image = product.Images.FirstOrDefault(i => i.Id == imageId)
+            ?? throw new NotFoundException($"Image '{imageId}' was not found on product '{productId}'.");
+
+        EnsureVariantOnProduct(product, request.ProductVariantId);
+
+        // "Replace" semantics for the editable fields (null clears / makes general).
+        image.AltText = request.AltText;
+        image.ProductVariantId = request.ProductVariantId;
+
+        if (request.IsPrimary == true && !image.IsPrimary)
+        {
+            // Promote: clear the old primary FIRST, then set the new one — two saves in one
+            // transaction so the filtered-unique primary index is never transiently violated.
+            await using var tx = await _db.Database.BeginTransactionAsync(ct);
+            foreach (ProductImage existing in product.Images.Where(i => i.IsPrimary))
+            {
+                existing.IsPrimary = false;
+            }
+            await _products.SaveChangesAsync(ct);
+
+            image.IsPrimary = true;
+            product.PrimaryImageBlobKey = image.BlobKey;
+            await _products.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+        }
+        else
+        {
+            await _products.SaveChangesAsync(ct);
+        }
+
+        return product.ToDetailDto();
+    }
+
+    // Rejects a variant id that doesn't belong to the product (or accepts null = general image).
+    private static void EnsureVariantOnProduct(Product product, Guid? variantId)
+    {
+        if (variantId is Guid vid && product.Variants.All(v => v.Id != vid))
+        {
+            throw new NotFoundException($"Variant '{vid}' was not found on product '{product.Id}'.");
+        }
     }
 
     /// <inheritdoc />

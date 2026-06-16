@@ -153,19 +153,131 @@ public class CatalogFlowTests
     }
 
     [Fact]
-    public async Task AdminUploadsImage_SetsPrimaryImageKey()
+    public async Task AdminUploadsImage_AddsToGallery_AndSetsPrimary()
     {
         (HttpClient admin, string csrf) = await AdminClientAsync();
         string suffix = Guid.NewGuid().ToString("N")[..8];
         string productId = await CreateProductAsync(admin, csrf, suffix);
 
-        HttpResponseMessage resp = await UploadImageAsync(admin, productId, MinimalPng(), "image/png", "p.png", csrf);
+        HttpResponseMessage resp = await UploadImageAsync(
+            admin, productId, MinimalPng(), "image/png", "p.png", csrf, altText: "front view");
 
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-        JsonElement data = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        JsonElement data = await DataAsync(resp);
         string? key = data.GetProperty("primaryImageBlobKey").GetString();
         Assert.StartsWith("products/", key);
         Assert.EndsWith(".png", key);
+
+        List<JsonElement> images = Images(data);
+        Assert.Single(images);
+        Assert.True(images[0].GetProperty("isPrimary").GetBoolean());
+        Assert.Equal("front view", images[0].GetProperty("altText").GetString());
+        Assert.Equal(key, images[0].GetProperty("blobKey").GetString()); // cache mirrors the primary
+    }
+
+    [Fact]
+    public async Task Gallery_AddTwoImages_OnlyFirstIsPrimary_WithDistinctSortOrder()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        await AddImageAsync(admin, productId, csrf, "a.png");
+        HttpResponseMessage resp = await UploadImageAsync(admin, productId, MinimalPng(), "image/png", "b.png", csrf);
+        List<JsonElement> images = Images(await DataAsync(resp));
+
+        Assert.Equal(2, images.Count);
+        Assert.Equal(1, images.Count(i => i.GetProperty("isPrimary").GetBoolean())); // exactly one primary
+        Assert.Equal(new[] { 0, 1 }, images.Select(i => i.GetProperty("sortOrder").GetInt32()).OrderBy(x => x));
+    }
+
+    [Fact]
+    public async Task Gallery_SetPrimary_SwapsPrimaryAndUpdatesCache()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        await AddImageAsync(admin, productId, csrf, "a.png");
+        string secondId = await AddImageAsync(admin, productId, csrf, "b.png");
+
+        HttpResponseMessage resp = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/{secondId}", new { isPrimary = true }, csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement data = await DataAsync(resp);
+        JsonElement promoted = Images(data).First(i => i.GetProperty("id").GetString() == secondId);
+        Assert.True(promoted.GetProperty("isPrimary").GetBoolean());
+        Assert.Equal(1, Images(data).Count(i => i.GetProperty("isPrimary").GetBoolean()));
+        Assert.Equal(promoted.GetProperty("blobKey").GetString(), data.GetProperty("primaryImageBlobKey").GetString());
+    }
+
+    [Fact]
+    public async Task Gallery_Reorder_ReassignsSortOrder()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string firstId = await AddImageAsync(admin, productId, csrf, "a.png");
+        string secondId = await AddImageAsync(admin, productId, csrf, "b.png");
+
+        // Reverse the order.
+        HttpResponseMessage resp = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/order", new { imageIds = new[] { secondId, firstId } }, csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        List<JsonElement> images = Images(await DataAsync(resp));
+        Assert.Equal(0, images.First(i => i.GetProperty("id").GetString() == secondId).GetProperty("sortOrder").GetInt32());
+        Assert.Equal(1, images.First(i => i.GetProperty("id").GetString() == firstId).GetProperty("sortOrder").GetInt32());
+    }
+
+    [Fact]
+    public async Task Gallery_DeletePrimary_PromotesNext_AndUpdatesCache()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string firstId = await AddImageAsync(admin, productId, csrf, "a.png"); // becomes primary
+        string secondId = await AddImageAsync(admin, productId, csrf, "b.png");
+
+        HttpResponseMessage resp = await DeleteAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/{firstId}", csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement data = await DataAsync(resp);
+        List<JsonElement> images = Images(data);
+        Assert.Single(images);
+        Assert.Equal(secondId, images[0].GetProperty("id").GetString());
+        Assert.True(images[0].GetProperty("isPrimary").GetBoolean()); // promoted
+        Assert.Equal(images[0].GetProperty("blobKey").GetString(), data.GetProperty("primaryImageBlobKey").GetString());
+    }
+
+    [Fact]
+    public async Task Gallery_UploadWithVariant_AssociatesImageToVariant()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string variantId = await AddVariantAsync(admin, productId, csrf, suffix);
+
+        HttpResponseMessage resp = await UploadImageAsync(
+            admin, productId, MinimalPng(), "image/png", "v.png", csrf, variantId: Guid.Parse(variantId));
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement image = Images(await DataAsync(resp)).Single();
+        Assert.Equal(variantId, image.GetProperty("productVariantId").GetString());
+    }
+
+    [Fact]
+    public async Task Gallery_UploadWithUnknownVariant_Returns404()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        HttpResponseMessage resp = await UploadImageAsync(
+            admin, productId, MinimalPng(), "image/png", "x.png", csrf, variantId: Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
     }
 
     [Fact]
@@ -276,15 +388,55 @@ public class CatalogFlowTests
     }
 
     private static Task<HttpResponseMessage> UploadImageAsync(
-        HttpClient client, string productId, byte[] bytes, string contentType, string fileName, string csrf)
+        HttpClient client, string productId, byte[] bytes, string contentType, string fileName, string csrf,
+        Guid? variantId = null, string? altText = null)
     {
         var fileContent = new ByteArrayContent(bytes);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         var form = new MultipartFormDataContent { { fileContent, "file", fileName } };
+        if (variantId is Guid vid)
+        {
+            form.Add(new StringContent(vid.ToString()), "variantId");
+        }
+        if (altText is not null)
+        {
+            form.Add(new StringContent(altText), "altText");
+        }
 
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/catalog/products/{productId}/image") { Content = form };
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/catalog/products/{productId}/images") { Content = form };
         request.Headers.Add("X-CSRF-Token", csrf);
         return client.SendAsync(request);
+    }
+
+    private static async Task<JsonElement> DataAsync(HttpResponseMessage resp) =>
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+
+    private static List<JsonElement> Images(JsonElement data) =>
+        data.GetProperty("images").EnumerateArray().ToList();
+
+    // Uploads a general image and returns the new image's id (last by sortOrder).
+    private static async Task<string> AddImageAsync(HttpClient admin, string productId, string csrf, string fileName)
+    {
+        HttpResponseMessage resp = await UploadImageAsync(admin, productId, MinimalPng(), "image/png", fileName, csrf);
+        resp.EnsureSuccessStatusCode();
+        JsonElement data = await DataAsync(resp);
+        return Images(data).OrderByDescending(i => i.GetProperty("sortOrder").GetInt32())
+            .First().GetProperty("id").GetString()!;
+    }
+
+    private static async Task<string> AddVariantAsync(HttpClient admin, string productId, string csrf, string suffix)
+    {
+        HttpResponseMessage resp = await PostJsonAsync(admin, $"/api/v1/catalog/products/{productId}/variants",
+            new
+            {
+                sku = $"VAR-{suffix}",
+                options = new Dictionary<string, string> { ["size"] = "M" },
+                priceCents = 1999,
+                compareAtPriceCents = (int?)null,
+                initialStock = 5,
+            }, csrf);
+        resp.EnsureSuccessStatusCode();
+        return (await DataAsync(resp)).GetProperty("id").GetString()!;
     }
 
     // A 1x1 transparent PNG — enough to exercise the upload path (the endpoint validates

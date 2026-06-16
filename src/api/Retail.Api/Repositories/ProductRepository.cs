@@ -58,6 +58,7 @@ public sealed class ProductRepository : IProductRepository
             .Include(p => p.Category)
             .Include(p => p.Variants)
                 .ThenInclude(v => v.Inventory)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(ct);
 
     /// <inheritdoc />
@@ -67,6 +68,7 @@ public sealed class ProductRepository : IProductRepository
             .Include(p => p.Category)
             .Include(p => p.Variants)
                 .ThenInclude(v => v.Inventory)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(ct);
 
     /// <inheritdoc />
@@ -122,6 +124,7 @@ public sealed class ProductRepository : IProductRepository
             .Include(p => p.Category)
             .Include(p => p.Variants)
                 .ThenInclude(v => v.Inventory)
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(ct);
 
     /// <inheritdoc />

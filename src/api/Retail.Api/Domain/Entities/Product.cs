@@ -42,11 +42,18 @@ public class Product : IAuditableEntity
     /// <summary>Whether the product is visible on the storefront.</summary>
     public bool IsPublished { get; set; }
 
-    /// <summary>Blob key (path) of the primary image in the <c>product-images</c> container. Set by image upload (Task 1.2.8).</summary>
+    /// <summary>
+    /// Denormalized cache of the primary <see cref="ProductImage"/>'s blob key, kept in sync by
+    /// the catalog service. Lets list/cart cards render the hero image with a single-column read
+    /// instead of joining the gallery (<c>ProductSummaryDto</c> / <c>CartItemDto</c>).
+    /// </summary>
     public string? PrimaryImageBlobKey { get; set; }
 
     /// <summary>The product's variants (price + options + stock live here).</summary>
     public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
+
+    /// <summary>The product's image gallery (general + variant-specific). See <see cref="ProductImage"/>.</summary>
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 
     /// <summary>Soft-delete flag — hidden by the global query filter when true.</summary>
     public bool IsDeleted { get; set; }

@@ -50,6 +50,9 @@ public static class CatalogMappers
             fromPriceCents);
     }
 
+    public static ProductImageDto ToImageDto(this ProductImage image) =>
+        new(image.Id, image.BlobKey, image.AltText, image.SortOrder, image.IsPrimary, image.ProductVariantId);
+
     public static ProductDetailDto ToDetailDto(this Product product)
     {
         CategoryDto category = product.Category is not null
@@ -59,6 +62,13 @@ public static class CatalogMappers
         IReadOnlyList<ProductVariantDto> variants = product.Variants
             .OrderBy(v => v.Sku, StringComparer.Ordinal)
             .Select(v => v.ToDto())
+            .ToList();
+
+        // Gallery in display order (SortOrder, then Id as a stable tiebreaker).
+        IReadOnlyList<ProductImageDto> images = product.Images
+            .OrderBy(i => i.SortOrder)
+            .ThenBy(i => i.Id)
+            .Select(i => i.ToImageDto())
             .ToList();
 
         return new ProductDetailDto(
@@ -73,7 +83,8 @@ public static class CatalogMappers
             category,
             product.IsPublished,
             product.PrimaryImageBlobKey,
-            variants);
+            variants,
+            images);
     }
 
     private static string StockStatusFor(int available) =>

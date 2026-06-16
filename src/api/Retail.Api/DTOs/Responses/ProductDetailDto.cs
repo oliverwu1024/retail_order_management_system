@@ -13,4 +13,5 @@ public sealed record ProductDetailDto(
     CategoryDto Category,
     bool IsPublished,
     string? PrimaryImageBlobKey,
-    IReadOnlyList<ProductVariantDto> Variants);
+    IReadOnlyList<ProductVariantDto> Variants,
+    IReadOnlyList<ProductImageDto> Images);
