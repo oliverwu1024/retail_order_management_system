@@ -82,6 +82,31 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Saved shipping/billing addresses (owned by a <see cref="CustomerProfile"/>). Not soft-deletable.</summary>
     public DbSet<Address> Addresses => Set<Address>();
 
+    // ── Cart & Orders (Phase 2) ──────────────────────────────────────────────
+    /// <summary>Shopping carts — member or anonymous-guest. Not soft-deletable (status-tombstoned).</summary>
+    public DbSet<Cart> Carts => Set<Cart>();
+
+    /// <summary>Cart line items.</summary>
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+
+    /// <summary>Soft stock holds placed between checkout-start and payment.</summary>
+    public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
+
+    /// <summary>Placed orders (member or guest).</summary>
+    public DbSet<Order> Orders => Set<Order>();
+
+    /// <summary>Order line items (with SKU/name/price snapshots).</summary>
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+
+    /// <summary>Payment events (Stripe charges / refunds).</summary>
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    /// <summary>Stripe webhook idempotency ledger (technical append-only table).</summary>
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
+
+    /// <summary>Per-order price breakdown (1:1 with <see cref="Order"/>).</summary>
+    public DbSet<OrderPriceBreakdown> OrderPriceBreakdowns => Set<OrderPriceBreakdown>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.
@@ -124,5 +149,11 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
         //    soft-deletable (DATABASE_DESIGN §1).
         builder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
         builder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
+
+        // 4. Order-number sequence (Phase 2). Seq_OrderNumber yields human-facing order
+        //    numbers starting at 10001; Order.OrderNumber defaults to NEXT VALUE FOR it
+        //    (see OrderConfiguration). Declared here, not in a configuration class, because
+        //    a sequence is a model-level object, not an entity-type mapping.
+        builder.HasSequence<int>("Seq_OrderNumber").StartsAt(10001).IncrementsBy(1);
     }
 }
