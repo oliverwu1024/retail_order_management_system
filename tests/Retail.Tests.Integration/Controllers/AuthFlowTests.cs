@@ -136,6 +136,33 @@ public class AuthFlowTests
         Assert.Equal(HttpStatusCode.Unauthorized, replayResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task Logout_ReissuesCsrf_SoNextLoginSucceedsWithoutReload()
+    {
+        HttpClient client = _factory.CreateClient();
+        string csrf = await GetCsrfAsync(client);
+
+        HttpResponseMessage login1 = await PostJsonAsync(
+            client, "/api/v1/auth/login",
+            new { email = "admin@test.local", password = "TestAdmin123456" }, csrf);
+        Assert.Equal(HttpStatusCode.OK, login1.StatusCode);
+
+        HttpResponseMessage logout = await PostJsonAsync(
+            client, "/api/v1/auth/logout", new { }, ExtractCookieValue(login1, "csrf"));
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+
+        // Logout clears the auth cookies but must leave a FRESH csrf cookie, so the client can log
+        // straight back in without a full page reload to re-seed it (regression: it used to be
+        // deleted, which left the next login with no token → 403 / a stuck UI).
+        string reissued = ExtractReissuedCsrf(logout);
+        Assert.False(string.IsNullOrWhiteSpace(reissued));
+
+        HttpResponseMessage login2 = await PostJsonAsync(
+            client, "/api/v1/auth/login",
+            new { email = "admin@test.local", password = "TestAdmin123456" }, reissued);
+        Assert.Equal(HttpStatusCode.OK, login2.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static string UniqueEmail() => $"user-{Guid.NewGuid():N}@test.local";
@@ -155,6 +182,24 @@ public class AuthFlowTests
         var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
         request.Headers.Add("X-CSRF-Token", csrf);
         return client.SendAsync(request);
+    }
+
+    // Logout emits TWO csrf Set-Cookie headers — a deletion ("csrf=; expires=…") followed by the
+    // re-issued token. Pick the non-empty one (the value the browser ends up keeping).
+    private static string ExtractReissuedCsrf(HttpResponseMessage response)
+    {
+        Assert.True(
+            response.Headers.TryGetValues("Set-Cookie", out IEnumerable<string>? cookies),
+            "Expected a Set-Cookie header carrying 'csrf'.");
+
+        string? setCookie = cookies!
+            .Where(c => c.StartsWith("csrf=", StringComparison.Ordinal))
+            .FirstOrDefault(c => !c.StartsWith("csrf=;", StringComparison.Ordinal));
+        Assert.NotNull(setCookie);
+
+        string afterName = setCookie!.Substring("csrf=".Length);
+        int semicolon = afterName.IndexOf(';');
+        return semicolon >= 0 ? afterName.Substring(0, semicolon) : afterName;
     }
 
     // Pulls a cookie value out of the response's Set-Cookie headers (the cookie

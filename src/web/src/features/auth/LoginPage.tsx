@@ -1,41 +1,59 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiClient } from '@/lib/api/client'
+import { useAuthStore } from '@/lib/store/auth-store'
 import { useSessionActions } from './useSessionActions'
 
 export function LoginPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { signIn } = useSessionActions()
+  const user = useAuthStore((state) => state.user)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Where to land after login — back to the page the guard bounced us from, else /admin.
-  const from =
-    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/admin'
+  // Where to land once authenticated: back to the page a guard bounced us from, else a role-based
+  // home (a customer can't see /admin, so defaulting there would just bounce them back here).
+  const fromPath = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+
+  // DECLARATIVE redirect: the instant the auth store holds a user we leave /login. This fires both
+  // for a just-completed login (signIn sets the store → re-render → here) and for an already
+  // signed-in user who lands on /login. Reacting to settled state — rather than an imperative
+  // navigate() in the submit handler — means it can't race the store update or be dropped, which
+  // is what left users authenticated-but-stranded on /login.
+  if (user) {
+    const destination = fromPath ?? (user.roles.includes('Administrator') ? '/admin' : '/')
+    return <Navigate to={destination} replace />
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     setSubmitting(true)
     setError('')
 
-    const { data, error: apiError } = await apiClient.POST('/api/v1/auth/login', {
-      body: { email, password },
-    })
+    try {
+      const { data, error: apiError } = await apiClient.POST('/api/v1/auth/login', {
+        body: { email, password },
+      })
 
-    setSubmitting(false)
-    if (apiError || !data?.data) {
-      setError('Invalid email or password.')
-      return
+      if (apiError || !data?.data) {
+        setError('Invalid email or password.')
+        return
+      }
+
+      // Sets the auth store → this component re-renders and the redirect above takes over.
+      signIn(data.data)
+    } catch {
+      // e.g. the CSRF cookie is missing → the client middleware throws. Surface it instead of
+      // leaving the button stuck on "Signing in…" forever.
+      setError('Something went wrong. Please refresh the page and try again.')
+    } finally {
+      setSubmitting(false)
     }
-
-    signIn(data.data)
-    navigate(from, { replace: true })
   }
 
   return (

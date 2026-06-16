@@ -26,7 +26,7 @@ export interface AuthUser {
   id: string
   /** Login email. */
   email: string
-  /** Role claims, e.g. ['Customer'] or ['Admin', 'StoreManager']. */
+  /** Role claims, e.g. ['Customer'] or ['Administrator', 'StoreManager']. */
   roles: string[]
 }
 
@@ -34,6 +34,13 @@ interface AuthState {
   user: AuthUser | null
   /** True while a /api/auth/me check is in flight on first load. */
   isLoading: boolean
+  /**
+   * Monotonic counter bumped on every EXPLICIT auth write (login / register / logout, which all
+   * flow through setUser). It lets an async hydration discard itself if a newer sign-in/out won
+   * the race in the meantime — see SessionBootstrapper. Without it, a slow /auth/me issued before
+   * login can resolve AFTER login and clobber the freshly-authenticated user back to null.
+   */
+  authEpoch: number
   setUser: (user: AuthUser | null) => void
   setLoading: (loading: boolean) => void
 }
@@ -41,11 +48,17 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
-  setUser: (user) => set({ user, isLoading: false }),
+  authEpoch: 0,
+  setUser: (user) => set((state) => ({ user, isLoading: false, authEpoch: state.authEpoch + 1 })),
   setLoading: (isLoading) => set({ isLoading }),
 }))
 
 /** Convenience: read the current user from non-React code (interceptors, etc). */
 export function getCurrentUser(): AuthUser | null {
   return useAuthStore.getState().user
+}
+
+/** Reads the current auth-write epoch (see {@link AuthState.authEpoch}). */
+export function getAuthEpoch(): number {
+  return useAuthStore.getState().authEpoch
 }

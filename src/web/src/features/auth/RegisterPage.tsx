@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiClient } from '@/lib/api/client'
+import { useAuthStore } from '@/lib/store/auth-store'
 import { useSessionActions } from './useSessionActions'
 
 // Mirrors RegisterRequestValidator + the Identity password policy (REQUIREMENTS §1.1):
@@ -24,8 +25,8 @@ const registerSchema = z.object({
 type RegisterValues = z.infer<typeof registerSchema>
 
 export function RegisterPage() {
-  const navigate = useNavigate()
   const { signIn } = useSessionActions()
+  const user = useAuthStore((state) => state.user)
   const [serverError, setServerError] = useState('')
   const {
     register,
@@ -36,22 +37,34 @@ export function RegisterPage() {
     defaultValues: { email: '', displayName: '', password: '' },
   })
 
+  // Declarative redirect once authenticated — register auto-signs-in, so signIn sets the store
+  // and this re-render takes over (and an already-signed-in visitor is sent on too). No imperative
+  // navigate() that could race the store update or be dropped.
+  if (user) {
+    return <Navigate to="/account" replace />
+  }
+
   async function onSubmit(values: RegisterValues) {
     setServerError('')
-    const { data, error } = await apiClient.POST('/api/v1/auth/register', {
-      body: { email: values.email, password: values.password, displayName: values.displayName },
-    })
+    try {
+      const { data, error } = await apiClient.POST('/api/v1/auth/register', {
+        body: { email: values.email, password: values.password, displayName: values.displayName },
+      })
 
-    if (error || !data?.data) {
-      // The most common failure is a duplicate email (Identity rejects it at insert).
-      setServerError('Registration failed. That email may already be registered.')
-      return
+      if (error || !data?.data) {
+        // The most common failure is a duplicate email (Identity rejects it at insert).
+        setServerError('Registration failed. That email may already be registered.')
+        return
+      }
+
+      // Register signs the new customer in (sets the auth cookies + store); the redirect above
+      // then takes over.
+      signIn(data.data)
+    } catch {
+      // e.g. a missing CSRF cookie makes the client middleware throw — show it rather than
+      // failing silently.
+      setServerError('Something went wrong. Please refresh the page and try again.')
     }
-
-    // Register signs the new customer in (sets the auth cookies), so we go straight to
-    // their account.
-    signIn(data.data)
-    navigate('/account', { replace: true })
   }
 
   return (

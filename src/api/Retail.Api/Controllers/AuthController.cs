@@ -121,6 +121,11 @@ public sealed class AuthController : ControllerBase
         string? refreshToken = Request.Cookies[AuthConstants.RefreshTokenCookie];
         await _authService.LogoutAsync(refreshToken, ct);
         AuthCookies.Clear(Response, _secureCookies);
+        // Re-issue a fresh (anonymous) CSRF token, just like login/register/refresh do. Clear()
+        // deletes the csrf cookie, and the SPA only seeds it on a full page load — so without this
+        // the next state-changing request (e.g. logging straight back in) would have no token and
+        // be rejected. Re-issuing keeps the logged-out client able to act without a page reload.
+        AuthCookies.WriteCsrf(Response, _csrfTokenService.Issue(), _secureCookies);
         return Ok(ApiResponse.Ok("Logged out."));
     }
 
