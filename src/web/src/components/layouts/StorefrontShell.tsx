@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { applyAuthUser } from '@/features/auth/session'
+import { useSessionActions } from '@/features/auth/useSessionActions'
 import { useCartQuery } from '@/features/cart/hooks/useCartQuery'
 import { apiClient } from '@/lib/api/client'
 import { useAuthStore } from '@/lib/store/auth-store'
@@ -12,6 +12,7 @@ const ADMIN_ROLES = ['Administrator']
 /** Storefront layout: auth-aware header + routed content (React Router layout route). */
 export function StorefrontShell() {
   const navigate = useNavigate()
+  const { signOut } = useSessionActions()
   const user = useAuthStore((state) => state.user)
   const isLoading = useAuthStore((state) => state.isLoading)
   const canAdmin = user?.roles.some((role) => ADMIN_ROLES.includes(role)) ?? false
@@ -22,7 +23,7 @@ export function StorefrontShell() {
 
   async function handleSignOut() {
     await apiClient.POST('/api/v1/auth/logout')
-    applyAuthUser(null)
+    signOut()
     navigate('/')
   }
 

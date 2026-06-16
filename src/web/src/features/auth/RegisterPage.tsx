@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiClient } from '@/lib/api/client'
-import { applyAuthUser } from './session'
+import { useSessionActions } from './useSessionActions'
 
 // Mirrors RegisterRequestValidator + the Identity password policy (REQUIREMENTS §1.1):
 // valid email, a display name, and a 12+ char password with at least one letter + digit.
@@ -25,6 +25,7 @@ type RegisterValues = z.infer<typeof registerSchema>
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const { signIn } = useSessionActions()
   const [serverError, setServerError] = useState('')
   const {
     register,
@@ -49,7 +50,7 @@ export function RegisterPage() {
 
     // Register signs the new customer in (sets the auth cookies), so we go straight to
     // their account.
-    applyAuthUser(data.data)
+    signIn(data.data)
     navigate('/account', { replace: true })
   }
 

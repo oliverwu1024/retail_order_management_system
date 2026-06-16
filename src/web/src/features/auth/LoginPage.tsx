@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiClient } from '@/lib/api/client'
-import { applyAuthUser } from './session'
+import { useSessionActions } from './useSessionActions'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { signIn } = useSessionActions()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -33,7 +34,7 @@ export function LoginPage() {
       return
     }
 
-    applyAuthUser(data.data)
+    signIn(data.data)
     navigate(from, { replace: true })
   }
 

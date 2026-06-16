@@ -125,6 +125,21 @@ public sealed class StripeWebhookService : IStripeWebhookService
             return;
         }
 
+        // charge.refunded ALSO fires for PARTIAL refunds (Charge.Refunded == false,
+        // AmountRefunded < Amount). Our refund handler is full-refund only — it flips the whole
+        // order to Refunded and restocks every line — so treating a partial as a full refund would
+        // over-restock and write a -TotalCents ledger row that doesn't match the money returned.
+        // Phase 2 has no partial-refund support (admin refund UI is Phase 3), so we log + skip.
+        // A sequence of partials that finally settles the full amount arrives with Refunded == true
+        // and is processed correctly then.
+        if (!charge.Refunded)
+        {
+            _logger.LogWarning(
+                "charge.refunded {EventId} is a PARTIAL refund (PaymentIntent {PaymentIntentId}, refunded {AmountRefunded} of {Amount}); skipping — partial refunds are not supported in Phase 2.",
+                stripeEvent.Id, charge.PaymentIntentId, charge.AmountRefunded, charge.Amount);
+            return;
+        }
+
         await _orderRefund.RefundByPaymentIntentAsync(charge.PaymentIntentId, ct);
         _logger.LogInformation(
             "charge.refunded {EventId} -> refunded PaymentIntent {PaymentIntentId}.",

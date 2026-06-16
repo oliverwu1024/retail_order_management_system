@@ -105,6 +105,32 @@ public class StripeWebhookFlowTests
         Assert.Equal(5, (await ReadStockAsync(variantId)).OnHand); // restocked
     }
 
+    [Fact]
+    public async Task Webhook_ChargeRefunded_Partial_IsIgnored()
+    {
+        Guid variantId = await SeedVariantAsync(onHand: 5);
+        Guid cartId = await SeedReservedCartAsync(variantId, quantity: 2);
+        string sessionId = $"cs_test_{Guid.NewGuid():N}";
+
+        // 1) Complete checkout → a Paid order (OnHand 5 → 3).
+        string completed = BuildCompletedEvent($"evt_{Guid.NewGuid():N}", sessionId, cartId);
+        Assert.Equal(HttpStatusCode.OK,
+            (await PostWebhookAsync(completed, Sign(completed, ApiFactory.TestWebhookSecret))).StatusCode);
+        Assert.Equal(3, (await ReadStockAsync(variantId)).OnHand);
+
+        // 2) A PARTIAL refund (refunded:false) is acked (200) but must NOT flip the order to
+        //    Refunded or restock — partial refunds are out of Phase-2 scope. Treating it as full
+        //    would over-restock and corrupt the ledger.
+        string partial = BuildPartialRefundedEvent($"evt_{Guid.NewGuid():N}", $"pi_test_{cartId:N}");
+        Assert.Equal(HttpStatusCode.OK,
+            (await PostWebhookAsync(partial, Sign(partial, ApiFactory.TestWebhookSecret))).StatusCode);
+
+        Order? order = await ReadOrderBySessionAsync(sessionId);
+        Assert.NotNull(order);
+        Assert.Equal(OrderStatus.Paid, order!.Status);            // still Paid, not Refunded
+        Assert.Equal(3, (await ReadStockAsync(variantId)).OnHand); // NOT restocked
+    }
+
     // ── webhook plumbing ────────────────────────────────────────────────────────
 
     private Task<HttpResponseMessage> PostWebhookAsync(string payload, string signature)
@@ -160,7 +186,27 @@ public class StripeWebhookFlowTests
               "object": "charge",
               "payment_intent": "{{paymentIntentId}}",
               "refunded": true,
+              "amount": 4398,
               "amount_refunded": 4398
+            }
+          }
+        }
+        """;
+
+    // A partial refund: charge.refunded fires, but Refunded == false and amount_refunded < amount.
+    private static string BuildPartialRefundedEvent(string eventId, string paymentIntentId) => $$"""
+        {
+          "id": "{{eventId}}",
+          "object": "event",
+          "type": "charge.refunded",
+          "data": {
+            "object": {
+              "id": "ch_test_{{eventId}}",
+              "object": "charge",
+              "payment_intent": "{{paymentIntentId}}",
+              "refunded": false,
+              "amount": 4398,
+              "amount_refunded": 500
             }
           }
         }

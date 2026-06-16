@@ -65,6 +65,22 @@ public class OrderViewingTests
     }
 
     [Fact]
+    public async Task GuestOrderBySession_DoesNotExposeMemberOrders()
+    {
+        // A MEMBER order also carries a Payment with the Stripe session id, but the anonymous
+        // by-session path is for GUEST orders only — returning a member's PII-bearing order to an
+        // unauthenticated caller would be an IDOR. Expect 404, not 200.
+        (_, _, Guid profileId) = await RegisterCustomerAsync();
+        string sessionId = $"cs_test_{Guid.NewGuid():N}";
+        await SeedOrderAsync(profileId, status: OrderStatus.Paid, sessionId: sessionId);
+
+        HttpClient anon = _factory.CreateClient();
+        HttpResponseMessage resp = await anon.GetAsync($"/api/v1/orders/by-session/{sessionId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task CancelPaidOrder_RefundsAndRestocks()
     {
         (HttpClient client, string csrf, Guid profileId) = await RegisterCustomerAsync();

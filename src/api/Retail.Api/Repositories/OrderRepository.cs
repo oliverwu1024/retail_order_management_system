@@ -52,7 +52,13 @@ public sealed class OrderRepository : IOrderRepository
     public async Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct) =>
         await _db.Orders.AsNoTracking()
             .Include(o => o.Lines)
-            .FirstOrDefaultAsync(o => o.Payments.Any(p => p.StripeSessionId == stripeSessionId), ct);
+            // Guest orders only. This backs the [AllowAnonymous] by-session lookup, where the Stripe
+            // session id IS the bearer. Member orders ALSO carry a Payment with this session id, so
+            // without the CustomerProfileId == null guard a member's PII-bearing order would be
+            // readable by any unauthenticated caller holding the id — members must instead use the
+            // account-scoped path (GetOwnedByIdAsync).
+            .FirstOrDefaultAsync(
+                o => o.CustomerProfileId == null && o.Payments.Any(p => p.StripeSessionId == stripeSessionId), ct);
 
     /// <inheritdoc />
     public async Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct) =>

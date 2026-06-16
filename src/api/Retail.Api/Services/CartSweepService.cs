@@ -48,10 +48,15 @@ public sealed class CartSweepService : ICartSweepService
             await _reservations.ReleaseCartReservationsAsync(cartId, ct);
             await _db.Carts
                 .Where(c => c.Id == cartId && c.Status == CartStatus.Open)
+                // Set-based UPDATE bypasses the AuditingInterceptor, so stamp the audit fields here
+                // (matching the sibling InventoryReservationRepository). The sweeper is a
+                // principal-less background pass, so UpdatedBy is null — exactly what the interceptor
+                // would record with no HttpContext, instead of leaving the last human actor's id.
                 .ExecuteUpdateAsync(
                     s => s
                         .SetProperty(c => c.Status, CartStatus.Abandoned)
-                        .SetProperty(c => c.UpdatedAt, now),
+                        .SetProperty(c => c.UpdatedAt, now)
+                        .SetProperty(c => c.UpdatedBy, (string?)null),
                     ct);
         }
 
