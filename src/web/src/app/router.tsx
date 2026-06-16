@@ -8,6 +8,7 @@ import { ProductFormPage } from '@/features/admin/ProductFormPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
 import { CartPage } from '@/features/cart/CartPage'
+import { CheckoutSuccessPage } from '@/features/checkout/CheckoutSuccessPage'
 import { CatalogPage } from '@/features/storefront/CatalogPage'
 import { ProductDetailPage } from '@/features/storefront/ProductDetailPage'
 
@@ -27,6 +28,8 @@ export const router = createBrowserRouter([
       { path: '/products/:slug', element: <ProductDetailPage /> },
       // Cart is open to everyone — guests get an anonymous cart (anon_cart_key cookie).
       { path: '/cart', element: <CartPage /> },
+      // Stripe success-return landing (open to all — guests check out too).
+      { path: '/checkout/success', element: <CheckoutSuccessPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       // My Account is Customer-only — the /profile endpoints require that role.

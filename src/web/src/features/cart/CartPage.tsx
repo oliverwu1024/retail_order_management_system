@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useStartCheckout } from '@/features/checkout/hooks/useStartCheckout'
 import { toast } from '@/hooks/use-toast'
 import { CartLineItem } from './components/CartLineItem'
 import { CartSummary } from './components/CartSummary'
@@ -12,9 +13,11 @@ export function CartPage() {
   const updateItem = useUpdateCartItem()
   const removeItem = useRemoveCartItem()
   const clearCart = useClearCart()
+  const startCheckout = useStartCheckout()
 
   // Any in-flight mutation disables the controls so a row can't be double-submitted.
-  const busy = updateItem.isPending || removeItem.isPending || clearCart.isPending
+  const busy =
+    updateItem.isPending || removeItem.isPending || clearCart.isPending || startCheckout.isPending
 
   if (isLoading) {
     return <CartSkeleton />
@@ -36,6 +39,14 @@ export function CartPage() {
         </Button>
       </div>
     )
+  }
+
+  function handleCheckout() {
+    startCheckout.mutate(undefined, {
+      onSuccess: (url) => window.location.assign(url),
+      onError: (error) =>
+        notifyError(error instanceof Error ? error.message : 'Could not start checkout.'),
+    })
   }
 
   return (
@@ -79,6 +90,8 @@ export function CartPage() {
         <CartSummary
           subtotalCents={cart?.subtotalCents ?? 0}
           totalQuantity={cart?.totalQuantity ?? 0}
+          onCheckout={handleCheckout}
+          isCheckingOut={startCheckout.isPending}
         />
       </div>
     </div>

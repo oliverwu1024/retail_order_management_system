@@ -5,10 +5,17 @@ import { formatCents } from '@/lib/format'
 interface CartSummaryProps {
   subtotalCents: number
   totalQuantity: number
+  onCheckout: () => void
+  isCheckingOut: boolean
 }
 
 /** Cart totals + the checkout call-to-action. */
-export function CartSummary({ subtotalCents, totalQuantity }: CartSummaryProps) {
+export function CartSummary({
+  subtotalCents,
+  totalQuantity,
+  onCheckout,
+  isCheckingOut,
+}: CartSummaryProps) {
   return (
     <Card className="h-fit">
       <CardHeader>
@@ -28,9 +35,9 @@ export function CartSummary({ subtotalCents, totalQuantity }: CartSummaryProps) 
         </p>
       </CardContent>
       <CardFooter>
-        {/* Checkout (Stripe hosted) is Phase 2 Chunk 3 — disabled until then. */}
-        <Button className="w-full" disabled title="Checkout is coming soon">
-          Proceed to checkout
+        {/* Redirects to Stripe's hosted checkout (the page does window.location.assign). */}
+        <Button className="w-full" onClick={onCheckout} disabled={isCheckingOut}>
+          {isCheckingOut ? 'Starting checkout…' : 'Proceed to checkout'}
         </Button>
       </CardFooter>
     </Card>
