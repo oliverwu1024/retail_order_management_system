@@ -15,3 +15,8 @@ export type Address = Schemas['AddressDto']
 
 export type Cart = Schemas['CartDto']
 export type CartItem = Schemas['CartItemDto']
+
+export type OrderSummary = Schemas['OrderSummaryDto']
+export type OrderDetail = Schemas['OrderDetailDto']
+export type OrderLine = Schemas['OrderLineDto']
+export type OrderPage = Schemas['OrderSummaryDtoPagedResult']

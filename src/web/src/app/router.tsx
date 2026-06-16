@@ -9,6 +9,8 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
 import { CartPage } from '@/features/cart/CartPage'
 import { CheckoutSuccessPage } from '@/features/checkout/CheckoutSuccessPage'
+import { OrderDetailPage } from '@/features/orders/OrderDetailPage'
+import { OrdersPage } from '@/features/orders/OrdersPage'
 import { CatalogPage } from '@/features/storefront/CatalogPage'
 import { ProductDetailPage } from '@/features/storefront/ProductDetailPage'
 
@@ -30,6 +32,23 @@ export const router = createBrowserRouter([
       { path: '/cart', element: <CartPage /> },
       // Stripe success-return landing (open to all — guests check out too).
       { path: '/checkout/success', element: <CheckoutSuccessPage /> },
+      // My Orders — Customer-only (the order endpoints require that role).
+      {
+        path: '/orders',
+        element: (
+          <RoleGuard allowedRoles={['Customer']}>
+            <OrdersPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: '/orders/:id',
+        element: (
+          <RoleGuard allowedRoles={['Customer']}>
+            <OrderDetailPage />
+          </RoleGuard>
+        ),
+      },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       // My Account is Customer-only — the /profile endpoints require that role.

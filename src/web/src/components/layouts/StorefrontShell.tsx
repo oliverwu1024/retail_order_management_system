@@ -51,9 +51,14 @@ export function StorefrontShell() {
               </Link>
             ) : null}
             {!isLoading && isCustomer ? (
-              <Link to="/account" className="text-muted-foreground hover:text-foreground">
-                Account
-              </Link>
+              <>
+                <Link to="/orders" className="text-muted-foreground hover:text-foreground">
+                  Orders
+                </Link>
+                <Link to="/account" className="text-muted-foreground hover:text-foreground">
+                  Account
+                </Link>
+              </>
             ) : null}
             {isLoading ? null : user ? (
               <>

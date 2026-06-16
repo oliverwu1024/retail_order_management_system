@@ -1319,6 +1319,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    page?: number;
+                    pageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrderSummaryDtoPagedResultApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrderDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/by-session/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    sessionId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrderDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrderDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/stripe/webhook": {
         parameters: {
             query?: never;
@@ -1584,6 +1769,89 @@ export interface components {
         LoginRequest: {
             email?: string | null;
             password?: string | null;
+        };
+        OrderAddressDto: {
+            recipientName?: string | null;
+            line1?: string | null;
+            line2?: string | null;
+            city?: string | null;
+            region?: string | null;
+            postalCode?: string | null;
+            country?: string | null;
+        };
+        OrderDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            orderNumber?: number;
+            status?: string | null;
+            /** Format: date-time */
+            placedAt?: string;
+            /** Format: int32 */
+            subtotalCents?: number;
+            /** Format: int32 */
+            taxCents?: number;
+            /** Format: int32 */
+            shippingCents?: number;
+            /** Format: int32 */
+            totalCents?: number;
+            shippingAddress?: components["schemas"]["OrderAddressDto"];
+            billingAddress?: components["schemas"]["OrderAddressDto"];
+            lines?: components["schemas"]["OrderLineDto"][] | null;
+        };
+        OrderDetailDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["OrderDetailDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        OrderLineDto: {
+            productName?: string | null;
+            sku?: string | null;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            unitPriceCents?: number;
+            /** Format: int32 */
+            lineTotalCents?: number;
+        };
+        OrderSummaryDto: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: int32 */
+            orderNumber?: number;
+            status?: string | null;
+            /** Format: date-time */
+            placedAt?: string;
+            /** Format: int32 */
+            totalCents?: number;
+            /** Format: int32 */
+            itemCount?: number;
+        };
+        OrderSummaryDtoPagedResult: {
+            items?: components["schemas"]["OrderSummaryDto"][] | null;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            readonly totalPages?: number;
+            readonly hasNext?: boolean;
+            readonly hasPrevious?: boolean;
+        };
+        OrderSummaryDtoPagedResultApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["OrderSummaryDtoPagedResult"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
         };
         ProblemDetails: {
             type?: string | null;
