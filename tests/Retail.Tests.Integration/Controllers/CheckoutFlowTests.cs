@@ -70,6 +70,26 @@ public class CheckoutFlowTests
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode); // INVENTORY_INSUFFICIENT
     }
 
+    [Fact]
+    public async Task Checkout_WhenTotalOverflowsInt_Returns409_AndHoldsNoStock()
+    {
+        (HttpClient admin, string adminCsrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        // A variant priced near int.MaxValue cents — two of them overflow an int subtotal. The
+        // checkout total guard (long math + int.MaxValue ceiling) must reject this BEFORE charging
+        // at Stripe, so a cart can't be charged here and then rejected at order creation.
+        Guid variantId = await CreateSellableVariantAsync(admin, adminCsrf, suffix, stock: 5, priceCents: 2_000_000_000);
+
+        (HttpClient guest, string csrf) = await GuestClientAsync();
+        Assert.Equal(HttpStatusCode.OK, (await AddItemAsync(guest, csrf, variantId, 2)).StatusCode);
+
+        HttpResponseMessage resp = await StartCheckoutAsync(guest, csrf);
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+        // The guard runs before the reservation, so no stock was held.
+        Assert.Equal(0, await ReadReservedAsync(variantId));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private static Task<HttpResponseMessage> StartCheckoutAsync(HttpClient client, string csrf) =>
@@ -99,7 +119,8 @@ public class CheckoutFlowTests
         return (client, csrf);
     }
 
-    private static async Task<Guid> CreateSellableVariantAsync(HttpClient admin, string csrf, string suffix, int stock)
+    private static async Task<Guid> CreateSellableVariantAsync(
+        HttpClient admin, string csrf, string suffix, int stock, int priceCents = 1999)
     {
         HttpResponseMessage categoryResp = await PostJsonAsync(admin, "/api/v1/catalog/categories",
             new { name = $"Cat {suffix}", slug = (string?)null, parentId = (Guid?)null }, csrf);
@@ -118,7 +139,7 @@ public class CheckoutFlowTests
             {
                 sku = $"VAR-{suffix}",
                 options = new Dictionary<string, string> { ["size"] = "M" },
-                priceCents = 1999,
+                priceCents,
                 compareAtPriceCents = (int?)null,
                 initialStock = stock,
             }, csrf);

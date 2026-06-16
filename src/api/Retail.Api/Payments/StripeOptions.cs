@@ -4,11 +4,13 @@ namespace Retail.Api.Payments;
 /// Stripe credentials, bound from the <c>Stripe</c> configuration section.
 /// </summary>
 /// <remarks>
-/// Unlike <c>Jwt:Key</c> / <c>Csrf:Key</c>, these are NOT validated at startup: checkout is a
-/// feature, not a boot requirement, so the catalogue + cart still run on a fresh clone with no
-/// Stripe keys. The keys are needed only when a payment endpoint is actually exercised (and the
-/// integration tests fake the gateway, so they never need a real key). In production the values
-/// come from Key Vault; in dev from user-secrets (<c>dotnet user-secrets set Stripe:SecretKey …</c>).
+/// In <b>Development</b> these are NOT validated at startup: checkout is a feature, not a boot
+/// requirement, so the catalogue + cart still run on a fresh clone with no Stripe keys (the
+/// integration tests fake the gateway, so they never need a real key). In any <b>deployed</b>
+/// (non-Development) environment they ARE required at boot (see <c>Program.cs</c>), because a blank
+/// webhook secret silently rejects every real Stripe event and a blank secret key breaks checkout —
+/// both failures we want to surface loudly at deploy time, not at first event. In production the
+/// values come from Key Vault; in dev from user-secrets (<c>dotnet user-secrets set Stripe:SecretKey …</c>).
 /// </remarks>
 public sealed class StripeOptions
 {

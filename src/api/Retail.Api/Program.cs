@@ -268,8 +268,26 @@ try
     builder.Services.AddHostedService<Retail.Api.HostedServices.CartExpirySweeper>();
 
     // ── Stripe payments (Story 2.2) ──────────────────────────────────────────
-    // Not validated at startup — checkout is a feature, not a boot requirement (see StripeOptions).
-    builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+    // In Development the keys are optional — checkout is a feature, not a boot requirement, so a
+    // fresh clone with no Stripe keys still runs the catalogue + cart (see StripeOptions). But in
+    // any DEPLOYED (non-Development) environment a blank webhook secret would silently reject every
+    // real Stripe event (fail-closed → 400 + a log line), and a blank secret key would break
+    // checkout — both silent. So outside Development we fail fast at boot, mirroring Jwt/Csrf,
+    // making the misconfiguration loud at deploy time rather than at first event.
+    OptionsBuilder<StripeOptions> stripeOptions = builder.Services
+        .AddOptions<StripeOptions>()
+        .Bind(builder.Configuration.GetSection(StripeOptions.SectionName));
+    if (!builder.Environment.IsDevelopment())
+    {
+        stripeOptions
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.WebhookSigningSecret),
+                "Stripe:WebhookSigningSecret must be configured outside Development (User Secrets / Key Vault) — a blank secret silently rejects every Stripe webhook.")
+            .Validate(
+                o => !string.IsNullOrWhiteSpace(o.SecretKey),
+                "Stripe:SecretKey must be configured outside Development (User Secrets / Key Vault) — Checkout Sessions cannot be created without it.")
+            .ValidateOnStart();
+    }
     builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
     builder.Services.AddScoped<IStripeRefundGateway, StripeRefundGateway>();
     builder.Services.AddScoped<ICheckoutService, CheckoutService>();

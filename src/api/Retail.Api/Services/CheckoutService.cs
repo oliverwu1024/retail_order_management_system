@@ -43,11 +43,21 @@ public sealed class CheckoutService : ICheckoutService
 
         Guid cartId = cart.Id;
 
+        // Money math in long, then bounded into int — mirrors OrderCreationService. We compute
+        // (and guard) the total BEFORE reserving stock or creating the Stripe session: an
+        // oversized cart must be rejected here, not charged at Stripe and then rejected at order
+        // creation (which would take the customer's money without producing an order). Computed
+        // from the line items, not cart.SubtotalCents, which is itself an int that could wrap.
+        long subtotalLong = cart.Items.Sum(item => (long)item.UnitPriceCents * item.Quantity);
+        long taxLong = (long)Math.Round(subtotalLong * GstRate, MidpointRounding.AwayFromZero);
+        if (subtotalLong + taxLong > int.MaxValue)
+        {
+            throw new ConflictException("Order total exceeds the maximum supported amount.");
+        }
+        int taxCents = (int)taxLong;
+
         // Hold the stock for the duration of checkout (throws 409 if it can't be held).
         await _reservations.ReserveCartAsync(cartId, ct);
-
-        int subtotalCents = cart.SubtotalCents;
-        int taxCents = (int)Math.Round(subtotalCents * GstRate, MidpointRounding.AwayFromZero);
 
         var lineItems = cart.Items
             .Select(item => new CheckoutLineItem(item.ProductName, item.UnitPriceCents, item.Quantity))
