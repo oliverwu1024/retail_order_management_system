@@ -26,8 +26,17 @@ public interface IInventoryReservationRepository
     /// </summary>
     Task<int> TryReserveAsync(Guid inventoryItemId, byte[] rowVersion, int quantity, DateTimeOffset now, string? actor, CancellationToken ct);
 
-    /// <summary>Decrements <c>Reserved</c> by <paramref name="quantity"/> when releasing a hold. Returns rows affected.</summary>
+    /// <summary>Decrements <c>Reserved</c> by <paramref name="quantity"/> when releasing a hold.</summary>
     Task ReleaseReservedAsync(Guid inventoryItemId, int quantity, DateTimeOffset now, string? actor, CancellationToken ct);
+
+    /// <summary>
+    /// Commits a hold on payment: decrements BOTH <c>OnHand</c> and <c>Reserved</c> by
+    /// <paramref name="quantity"/> — the units leave the warehouse for good.
+    /// </summary>
+    Task CommitReservedAsync(Guid inventoryItemId, int quantity, DateTimeOffset now, string? actor, CancellationToken ct);
+
+    /// <summary>Returns <paramref name="quantity"/> units to <c>OnHand</c> for a variant (e.g. on refund).</summary>
+    Task RestockByVariantAsync(Guid productVariantId, int quantity, DateTimeOffset now, string? actor, CancellationToken ct);
 
     /// <summary>Stages a new reservation for insert.</summary>
     void AddReservation(InventoryReservation reservation);

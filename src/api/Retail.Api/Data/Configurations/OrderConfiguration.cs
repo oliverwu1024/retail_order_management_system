@@ -14,7 +14,11 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> builder)
     {
-        builder.ToTable("Order"); // EF brackets the reserved word → [Order].
+        // [Order] — EF brackets the reserved word. The CHECK enforces the identity invariant
+        // at the database: an order is a member (CustomerProfileId) XOR a guest (GuestEmail).
+        builder.ToTable("Order", table => table.HasCheckConstraint(
+            "CK_Order_Identity",
+            "([CustomerProfileId] IS NOT NULL AND [GuestEmail] IS NULL) OR ([CustomerProfileId] IS NULL AND [GuestEmail] IS NOT NULL)"));
         builder.HasKey(o => o.Id);
 
         // OrderNumber is assigned by the DB from Seq_OrderNumber (created in

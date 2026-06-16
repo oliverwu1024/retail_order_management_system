@@ -19,6 +19,7 @@ using Retail.Api.Data.Interceptors;
 using Retail.Api.Domain.Entities;
 using Retail.Api.Identity;
 using Retail.Api.Middlewares;
+using Retail.Api.Payments;
 using Retail.Api.Repositories;
 using Retail.Api.Services;
 using Retail.Api.Storage;
@@ -265,6 +266,17 @@ try
     // Cart expiry sweeper: a background service runs the scoped sweep on a timer.
     builder.Services.AddScoped<ICartSweepService, CartSweepService>();
     builder.Services.AddHostedService<Retail.Api.HostedServices.CartExpirySweeper>();
+
+    // ── Stripe payments (Story 2.2) ──────────────────────────────────────────
+    // Not validated at startup — checkout is a feature, not a boot requirement (see StripeOptions).
+    builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+    builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
+    builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+    builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+    builder.Services.AddScoped<IOrderCreationService, OrderCreationService>();
+    builder.Services.AddScoped<IOrderRefundService, OrderRefundService>();
+    builder.Services.AddScoped<IProcessedStripeEventStore, ProcessedStripeEventStore>();
+    builder.Services.AddScoped<IStripeWebhookService, StripeWebhookService>();
 
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks

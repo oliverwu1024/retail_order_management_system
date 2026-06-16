@@ -33,6 +33,11 @@ public sealed class CsrfMiddleware
         "TRACE",
     };
 
+    // The Stripe webhook is a server-to-server POST that carries no cookies; it authenticates
+    // via its Stripe-Signature header (verified in the handler), not the SPA's double-submit
+    // token. So it is exempt from CSRF. Must match PaymentsController's webhook route.
+    private const string StripeWebhookPath = "/api/v1/payments/stripe/webhook";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -50,7 +55,8 @@ public sealed class CsrfMiddleware
     // middleware supports extra InvokeAsync parameters from DI).
     public async Task InvokeAsync(HttpContext context, ICsrfTokenService csrf)
     {
-        if (!SafeMethods.Contains(context.Request.Method))
+        if (!SafeMethods.Contains(context.Request.Method)
+            && !context.Request.Path.StartsWithSegments(StripeWebhookPath))
         {
             string? cookie = context.Request.Cookies[AuthConstants.CsrfCookie];
             string header = context.Request.Headers[AuthConstants.CsrfHeader].ToString();

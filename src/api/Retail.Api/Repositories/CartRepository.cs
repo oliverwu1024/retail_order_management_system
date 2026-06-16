@@ -26,6 +26,11 @@ public sealed class CartRepository : ICartRepository
             .FirstOrDefaultAsync(c => c.AnonymousKey == anonymousKey, ct);
 
     /// <inheritdoc />
+    public async Task<Cart?> GetOpenCartByIdAsync(Guid cartId, CancellationToken ct) =>
+        await OpenCartsWithGraph()
+            .FirstOrDefaultAsync(c => c.Id == cartId, ct);
+
+    /// <inheritdoc />
     public async Task AddCartAsync(Cart cart, CancellationToken ct) =>
         await _db.Carts.AddAsync(cart, ct);
 

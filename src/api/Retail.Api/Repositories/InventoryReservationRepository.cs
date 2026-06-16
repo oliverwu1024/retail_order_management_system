@@ -63,6 +63,31 @@ public sealed class InventoryReservationRepository : IInventoryReservationReposi
                 ct);
 
     /// <inheritdoc />
+    public async Task CommitReservedAsync(
+        Guid inventoryItemId, int quantity, DateTimeOffset now, string? actor, CancellationToken ct) =>
+        await _db.InventoryItems
+            .Where(i => i.Id == inventoryItemId)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(i => i.OnHand, i => i.OnHand - quantity)
+                    .SetProperty(i => i.Reserved, i => i.Reserved - quantity)
+                    .SetProperty(i => i.UpdatedAt, now)
+                    .SetProperty(i => i.UpdatedBy, actor),
+                ct);
+
+    /// <inheritdoc />
+    public async Task RestockByVariantAsync(
+        Guid productVariantId, int quantity, DateTimeOffset now, string? actor, CancellationToken ct) =>
+        await _db.InventoryItems
+            .Where(i => i.ProductVariantId == productVariantId)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(i => i.OnHand, i => i.OnHand + quantity)
+                    .SetProperty(i => i.UpdatedAt, now)
+                    .SetProperty(i => i.UpdatedBy, actor),
+                ct);
+
+    /// <inheritdoc />
     public void AddReservation(InventoryReservation reservation) =>
         _db.InventoryReservations.Add(reservation);
 

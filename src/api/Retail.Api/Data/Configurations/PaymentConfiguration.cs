@@ -29,8 +29,12 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(p => p.OrderId, "IX_Payment_OrderId");
-        // Webhook lookups by Stripe id — filtered to the rows that have one.
-        builder.HasIndex(p => p.StripeSessionId, "IX_Payment_StripeSessionId")
+        // UNIQUE per Stripe session (filtered to the rows that have one): this is the
+        // database-level idempotency guard for order creation — a concurrent webhook
+        // redelivery that tries to create a second order/payment for the same session hits
+        // this index, and OrderCreationService treats the violation as "already processed".
+        builder.HasIndex(p => p.StripeSessionId, "UX_Payment_StripeSessionId")
+            .IsUnique()
             .HasFilter("[StripeSessionId] IS NOT NULL");
         builder.HasIndex(p => p.StripePaymentIntentId, "IX_Payment_StripePaymentIntentId")
             .HasFilter("[StripePaymentIntentId] IS NOT NULL");

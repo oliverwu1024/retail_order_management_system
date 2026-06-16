@@ -17,6 +17,9 @@ public interface ICartRepository
     /// <summary>The guest's OPEN cart by anonymous key, tracked, with the same Include graph. Null if none.</summary>
     Task<Cart?> GetOpenCartByAnonymousKeyAsync(string anonymousKey, CancellationToken ct);
 
+    /// <summary>An OPEN cart by id, tracked, with the same item→variant→(product+inventory) graph. For checkout completion. Null if none.</summary>
+    Task<Cart?> GetOpenCartByIdAsync(Guid cartId, CancellationToken ct);
+
     /// <summary>Stages a new cart for insert.</summary>
     Task AddCartAsync(Cart cart, CancellationToken ct);
 

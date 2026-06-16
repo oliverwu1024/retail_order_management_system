@@ -307,3 +307,40 @@ Conventions mirrored: `ApiResponse<T>` envelope, 422 validation via the explicit
   "My Orders"; currently out of scope — guests use the token link only.)
 - A later docs pass to fold §4 reconciliations back into `DATABASE_DESIGN.md`/`REQUIREMENTS.md`.
 - Optional `Drawer`/`Sheet` primitive for a cart drawer (deferred; page-first for now).
+
+---
+
+## 16. Checkout hardening — deferred (adversarial review, 2026-06-16)
+
+A 5-lens adversarial review of the 3b checkout/order-creation code confirmed 13 findings
+(several were the same issue from different lenses). The high-confidence, bounded ones were
+**fixed immediately**:
+
+- **DB-level idempotency** — `Payment.StripeSessionId` is now UNIQUE (filtered); a concurrent
+  webhook redelivery that tries to double-create hits the index and `OrderCreationService`
+  returns the existing order (catch SQL 2601/2627). Migration `0005_checkout_idempotency`.
+- **Identity XOR** — app guard + a `CK_Order_Identity` CHECK constraint (member XOR guest email).
+- **Money overflow** — order totals computed in `long`, bounded back into `int`.
+- **No silent stock leak** — if a checkout's holds are gone at webhook time, completion now
+  **fails loudly** (the transaction rolls back) instead of creating an order with no stock movement.
+
+**Deferred to a Phase-8 reconciliation pass** (decided 2026-06-16 — the MVP happy path is correct;
+each of these needs the shopper to mutate the cart *after* clicking checkout, or a webhook delayed
+past the cart's expiry):
+
+1. **Cart mutable during an in-flight checkout** (#5/#8/#9) — the cart stays `Open` after
+   `StartCheckout`, so add/update/remove can change it before the webhook; the order is built from
+   the live cart but stock is committed from the (stale) reservations, and the Stripe-charged
+   amount can diverge from the recomputed order total.
+2. **Reserve idempotency under-reserves a grown cart** (#8) — `ReserveCartAsync` early-returns when
+   any active hold exists, so items added after the first reserve aren't held.
+3. **Guest-cart merge during checkout doesn't re-home reservations** (#12) — holds keep the guest
+   `CartId` when a guest cart merges into the member cart mid-checkout.
+4. **Webhook lag vs the sweeper** — a cart can be swept (holds released) if the webhook is delayed
+   past the cart's 30-min expiry; the loud-failure guard prevents corruption but the order isn't
+   created (Stripe keeps retrying).
+
+**Proper fix (Phase 8):** a `CheckingOut` cart state set at `StartCheckout` (rejects mutations,
+excluded from the sweeper, re-homed on merge) + a 15-min reservation-expiry release + a
+cancel-release path + a reconciliation job that re-acquires or refunds when holds expired before a
+paid webhook arrived. This is event-driven reconciliation territory — hence Phase 8.

@@ -66,6 +66,14 @@ public sealed class InventoryReservationService : IInventoryReservationService
             return;
         }
 
+        // Idempotent: if the cart is already holding stock (e.g. the shopper clicked checkout
+        // twice, or re-opened the Stripe page), don't reserve a second time.
+        IReadOnlyList<InventoryReservation> existing = await _repo.GetActiveCartReservationsAsync(cartId, ct);
+        if (existing.Count > 0)
+        {
+            return;
+        }
+
         DateTimeOffset now = _timeProvider.GetUtcNow();
         string? actor = _currentUser.UserId; // null for a guest checkout — fine
         DateTimeOffset expiresAt = now.Add(ReservationTtl);
