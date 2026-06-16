@@ -113,6 +113,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // events with TestWebhookSecret.
             services.RemoveAll<IStripeCheckoutGateway>();
             services.AddScoped<IStripeCheckoutGateway, FakeStripeCheckoutGateway>();
+            services.RemoveAll<IStripeRefundGateway>();
+            services.AddScoped<IStripeRefundGateway, FakeStripeRefundGateway>();
         });
     }
 
