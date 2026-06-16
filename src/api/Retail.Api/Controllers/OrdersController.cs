@@ -21,15 +21,21 @@ namespace Retail.Api.Controllers;
 public sealed class OrdersController : ControllerBase
 {
     private readonly ICheckoutService _checkout;
+    private readonly IOrderQueryService _orders;
+    private readonly IOrderCancellationService _cancellation;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IValidator<StartCheckoutRequest> _startCheckoutValidator;
 
     public OrdersController(
         ICheckoutService checkout,
+        IOrderQueryService orders,
+        IOrderCancellationService cancellation,
         ICurrentUserAccessor currentUser,
         IValidator<StartCheckoutRequest> startCheckoutValidator)
     {
         _checkout = checkout;
+        _orders = orders;
+        _cancellation = cancellation;
         _currentUser = currentUser;
         _startCheckoutValidator = startCheckoutValidator;
     }
@@ -51,6 +57,75 @@ public sealed class OrdersController : ControllerBase
         var caller = new CartCaller(_currentUser.UserId, Request.Cookies[CartConstants.AnonymousCartKeyCookie]);
         CheckoutSessionResponse result = await _checkout.StartCheckoutAsync(caller, request, ct);
         return Ok(ApiResponse<CheckoutSessionResponse>.Ok(result));
+    }
+
+    /// <summary>The current customer's orders, newest first (paged).</summary>
+    [HttpGet]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<OrderSummaryDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListMyOrders([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
+    {
+        if (!TryGetUserId(out string userId))
+        {
+            return Unauthorized(ApiResponse.Fail("Not authenticated."));
+        }
+
+        PagedResult<OrderSummaryDto> result = await _orders.GetMyOrdersAsync(userId, page, pageSize, ct);
+        return Ok(ApiResponse<PagedResult<OrderSummaryDto>>.Ok(result));
+    }
+
+    /// <summary>One of the current customer's orders (404 if it isn't theirs).</summary>
+    [HttpGet("{id:guid}")]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyOrder(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out string userId))
+        {
+            return Unauthorized(ApiResponse.Fail("Not authenticated."));
+        }
+
+        OrderDetailDto order = await _orders.GetMyOrderAsync(userId, id, ct);
+        return Ok(ApiResponse<OrderDetailDto>.Ok(order));
+    }
+
+    /// <summary>
+    /// Guest order lookup by Stripe session id — the high-entropy bearer the success page holds.
+    /// Open to anyone with the session id; the id itself is the (unguessable) access token.
+    /// </summary>
+    [HttpGet("by-session/{sessionId}")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOrderBySession(string sessionId, CancellationToken ct)
+    {
+        OrderDetailDto order = await _orders.GetOrderBySessionAsync(sessionId, ct);
+        return Ok(ApiResponse<OrderDetailDto>.Ok(order));
+    }
+
+    /// <summary>Cancels one of the current customer's paid orders (refund + restock).</summary>
+    [HttpPost("{id:guid}/cancel")]
+    [Authorize(Roles = Roles.Customer)]
+    [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CancelMyOrder(Guid id, CancellationToken ct)
+    {
+        if (!TryGetUserId(out string userId))
+        {
+            return Unauthorized(ApiResponse.Fail("Not authenticated."));
+        }
+
+        OrderDetailDto order = await _cancellation.CancelMyOrderAsync(userId, id, ct);
+        return Ok(ApiResponse<OrderDetailDto>.Ok(order));
+    }
+
+    // [Authorize] guarantees an authenticated principal, but we resolve the id defensively.
+    private bool TryGetUserId(out string userId)
+    {
+        userId = _currentUser.UserId ?? string.Empty;
+        return userId.Length > 0;
     }
 
     private async Task<IActionResult?> ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken ct)

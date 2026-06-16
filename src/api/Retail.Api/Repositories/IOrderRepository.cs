@@ -20,6 +20,18 @@ public interface IOrderRepository
     /// </summary>
     Task<Order?> GetByPaymentIntentIdAsync(string paymentIntentId, CancellationToken ct);
 
+    /// <summary>A page of a customer's orders (newest first), each with its lines, read-only.</summary>
+    Task<(IReadOnlyList<Order> Items, int Total)> GetPagedByProfileAsync(Guid customerProfileId, int page, int pageSize, CancellationToken ct);
+
+    /// <summary>An order by id scoped to its owner, with lines, read-only. Null if missing or not the caller's.</summary>
+    Task<Order?> GetOwnedByIdAsync(Guid orderId, Guid customerProfileId, CancellationToken ct);
+
+    /// <summary>An order (with lines) by Stripe session id — the guest bearer lookup. Read-only. Null if none.</summary>
+    Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct);
+
+    /// <summary>The PaymentIntent id of an order's charge (positive payment), for issuing a refund. Null if none.</summary>
+    Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct);
+
     /// <summary>Stages a new order (with its lines, breakdown, and payment graph) for insert.</summary>
     void AddOrder(Order order);
 

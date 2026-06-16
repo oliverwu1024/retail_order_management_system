@@ -28,6 +28,40 @@ public sealed class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.Payments.Any(p => p.StripePaymentIntentId == paymentIntentId), ct);
 
     /// <inheritdoc />
+    public async Task<(IReadOnlyList<Order> Items, int Total)> GetPagedByProfileAsync(
+        Guid customerProfileId, int page, int pageSize, CancellationToken ct)
+    {
+        IQueryable<Order> query = _db.Orders.AsNoTracking().Where(o => o.CustomerProfileId == customerProfileId);
+        int total = await query.CountAsync(ct);
+        List<Order> items = await query
+            .Include(o => o.Lines)
+            .OrderByDescending(o => o.PlacedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+        return (items, total);
+    }
+
+    /// <inheritdoc />
+    public async Task<Order?> GetOwnedByIdAsync(Guid orderId, Guid customerProfileId, CancellationToken ct) =>
+        await _db.Orders.AsNoTracking()
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.CustomerProfileId == customerProfileId, ct);
+
+    /// <inheritdoc />
+    public async Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct) =>
+        await _db.Orders.AsNoTracking()
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Payments.Any(p => p.StripeSessionId == stripeSessionId), ct);
+
+    /// <inheritdoc />
+    public async Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct) =>
+        await _db.Payments.AsNoTracking()
+            .Where(p => p.OrderId == orderId && p.AmountCents > 0 && p.StripePaymentIntentId != null)
+            .Select(p => p.StripePaymentIntentId)
+            .FirstOrDefaultAsync(ct);
+
+    /// <inheritdoc />
     public void AddOrder(Order order) =>
         _db.Orders.Add(order);
 

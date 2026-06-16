@@ -271,12 +271,15 @@ try
     // Not validated at startup — checkout is a feature, not a boot requirement (see StripeOptions).
     builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
     builder.Services.AddScoped<IStripeCheckoutGateway, StripeCheckoutGateway>();
+    builder.Services.AddScoped<IStripeRefundGateway, StripeRefundGateway>();
     builder.Services.AddScoped<ICheckoutService, CheckoutService>();
     builder.Services.AddScoped<IOrderRepository, OrderRepository>();
     builder.Services.AddScoped<IOrderCreationService, OrderCreationService>();
     builder.Services.AddScoped<IOrderRefundService, OrderRefundService>();
     builder.Services.AddScoped<IProcessedStripeEventStore, ProcessedStripeEventStore>();
     builder.Services.AddScoped<IStripeWebhookService, StripeWebhookService>();
+    builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
+    builder.Services.AddScoped<IOrderCancellationService, OrderCancellationService>();
 
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
