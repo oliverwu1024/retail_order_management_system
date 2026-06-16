@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAddToCart } from '@/features/cart/hooks/useCartMutations'
 import { toast } from '@/hooks/use-toast'
 import { formatCents } from '@/lib/format'
-import { ProductImage } from './components/ProductImage'
+import { ProductGallery } from './components/ProductGallery'
 import { StockBadge } from './components/StockBadge'
 import { VariantSelector } from './components/VariantSelector'
 import { useProductQuery } from './hooks/useProductQuery'
@@ -61,10 +61,13 @@ export function ProductDetailPage() {
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
-      <ProductImage
-        blobKey={product.primaryImageBlobKey}
+      {/* Keyed by the selected variant so the gallery resets to that variant's first image. */}
+      <ProductGallery
+        key={selected?.id ?? 'base'}
+        images={product.images ?? []}
+        variantId={selected?.id}
+        fallbackBlobKey={product.primaryImageBlobKey}
         alt={product.name ?? 'Product'}
-        className="aspect-square w-full rounded-lg"
       />
 
       <div className="space-y-4">
