@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { applyAuthUser } from '@/features/auth/session'
+import { useCartQuery } from '@/features/cart/hooks/useCartQuery'
 import { apiClient } from '@/lib/api/client'
 import { useAuthStore } from '@/lib/store/auth-store'
 
@@ -15,6 +16,9 @@ export function StorefrontShell() {
   const isLoading = useAuthStore((state) => state.isLoading)
   const canAdmin = user?.roles.some((role) => ADMIN_ROLES.includes(role)) ?? false
   const isCustomer = user?.roles.includes('Customer') ?? false
+  // The cart badge shows for everyone (guests included); shares the cart cache with /cart.
+  const { data: cart } = useCartQuery()
+  const cartCount = cart?.totalQuantity ?? 0
 
   async function handleSignOut() {
     await apiClient.POST('/api/v1/auth/logout')
@@ -32,6 +36,14 @@ export function StorefrontShell() {
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/" className="text-muted-foreground hover:text-foreground">
               Catalog
+            </Link>
+            <Link to="/cart" className="text-muted-foreground hover:text-foreground">
+              Cart
+              {cartCount > 0 ? (
+                <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-medium text-primary-foreground">
+                  {cartCount}
+                </span>
+              ) : null}
             </Link>
             {!isLoading && canAdmin ? (
               <Link to="/admin" className="text-muted-foreground hover:text-foreground">

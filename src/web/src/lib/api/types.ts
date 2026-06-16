@@ -12,3 +12,6 @@ export type ProductPage = Schemas['ProductSummaryDtoPagedResult']
 
 export type CustomerProfile = Schemas['CustomerProfileDto']
 export type Address = Schemas['AddressDto']
+
+export type Cart = Schemas['CartDto']
+export type CartItem = Schemas['CartItemDto']

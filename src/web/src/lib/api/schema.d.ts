@@ -271,6 +271,201 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CartDtoApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CartDtoApiResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AddCartItemRequest"];
+                    "text/json": components["schemas"]["AddCartItemRequest"];
+                    "application/*+json": components["schemas"]["AddCartItemRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CartDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/items/{variantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    variantId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["UpdateCartItemRequest"];
+                    "text/json": components["schemas"]["UpdateCartItemRequest"];
+                    "application/*+json": components["schemas"]["UpdateCartItemRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CartDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    variantId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CartDtoApiResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/products": {
         parameters: {
             query?: never;
@@ -1069,6 +1264,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddCartItemRequest: {
+            /** Format: uuid */
+            productVariantId?: string;
+            /** Format: int32 */
+            quantity?: number;
+        };
         AddressDto: {
             /** Format: uuid */
             id?: string;
@@ -1136,6 +1337,46 @@ export interface components {
             traceId?: string | null;
             /** Format: date-time */
             timestamp?: string;
+        };
+        CartDto: {
+            /** Format: uuid */
+            id?: string;
+            items?: components["schemas"]["CartItemDto"][] | null;
+            /** Format: int32 */
+            subtotalCents?: number;
+            /** Format: int32 */
+            totalQuantity?: number;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        CartDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["CartDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        CartItemDto: {
+            /** Format: uuid */
+            productVariantId?: string;
+            /** Format: uuid */
+            productId?: string;
+            productName?: string | null;
+            productSlug?: string | null;
+            sku?: string | null;
+            options?: {
+                [key: string]: string;
+            } | null;
+            /** Format: int32 */
+            unitPriceCents?: number;
+            /** Format: int32 */
+            quantity?: number;
+            /** Format: int32 */
+            lineTotalCents?: number;
+            primaryImageBlobKey?: string | null;
+            inStock?: boolean;
         };
         CategoryDto: {
             /** Format: uuid */
@@ -1318,6 +1559,10 @@ export interface components {
             email?: string | null;
             password?: string | null;
             displayName?: string | null;
+        };
+        UpdateCartItemRequest: {
+            /** Format: int32 */
+            quantity?: number;
         };
         UpdateProductRequest: {
             name?: string | null;
