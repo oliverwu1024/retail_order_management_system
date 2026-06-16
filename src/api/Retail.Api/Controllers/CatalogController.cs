@@ -27,6 +27,7 @@ public sealed class CatalogController : ControllerBase
     private readonly IValidator<UpdateProductRequest> _updateProductValidator;
     private readonly IValidator<CreateVariantRequest> _createVariantValidator;
     private readonly IValidator<UpdateVariantRequest> _updateVariantValidator;
+    private readonly IValidator<UpdateProductImageRequest> _updateImageValidator;
 
     public CatalogController(
         ICatalogService catalog,
@@ -34,7 +35,8 @@ public sealed class CatalogController : ControllerBase
         IValidator<CreateProductRequest> createProductValidator,
         IValidator<UpdateProductRequest> updateProductValidator,
         IValidator<CreateVariantRequest> createVariantValidator,
-        IValidator<UpdateVariantRequest> updateVariantValidator)
+        IValidator<UpdateVariantRequest> updateVariantValidator,
+        IValidator<UpdateProductImageRequest> updateImageValidator)
     {
         _catalog = catalog;
         _createCategoryValidator = createCategoryValidator;
@@ -42,6 +44,7 @@ public sealed class CatalogController : ControllerBase
         _updateProductValidator = updateProductValidator;
         _createVariantValidator = createVariantValidator;
         _updateVariantValidator = updateVariantValidator;
+        _updateImageValidator = updateImageValidator;
     }
 
     // ── Public reads ────────────────────────────────────────────────────────────
@@ -175,6 +178,11 @@ public sealed class CatalogController : ControllerBase
     public async Task<IActionResult> AddProductImage(
         Guid id, IFormFile file, [FromForm] Guid? variantId, [FromForm] string? altText, CancellationToken ct)
     {
+        if (altText is { Length: > 200 })
+        {
+            return UnprocessableEntity(ApiResponse.Fail("Alt text must be 200 characters or fewer."));
+        }
+
         (IActionResult? error, Stream? stream, string contentType) = await ValidateImageUploadAsync(file, ct);
         if (error is not null)
         {
@@ -230,8 +238,14 @@ public sealed class CatalogController : ControllerBase
     [Authorize(Roles = Roles.Administrator)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UpdateProductImage(Guid id, Guid imageId, [FromBody] UpdateProductImageRequest request, CancellationToken ct)
     {
+        if (await ValidateAsync(_updateImageValidator, request, ct) is { } invalid)
+        {
+            return invalid;
+        }
+
         ProductDetailDto product = await _catalog.UpdateProductImageAsync(id, imageId, request, ct);
         return Ok(ApiResponse<ProductDetailDto>.Ok(product));
     }

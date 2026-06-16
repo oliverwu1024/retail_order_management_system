@@ -152,6 +152,7 @@ function UploadRow({ productId, variants }: { productId: string; variants: Produ
           <span className="block text-muted-foreground">Alt text</span>
           <Input
             value={altText}
+            maxLength={200}
             onChange={(e) => setAltText(e.target.value)}
             placeholder="e.g. front view"
             className="w-56"
@@ -185,24 +186,26 @@ function GalleryRow({
   const imageId = image.id ?? ''
   const busy = updateImage.isPending || reorderImages.isPending || deleteImage.isPending
 
-  // Every PUT carries the full editable state (the API replaces altText + variant), so preserve
-  // the fields we aren't changing.
-  function save(body: {
-    altText?: string | null
-    productVariantId?: string | null
-    isPrimary?: boolean
-  }) {
+  // Controlled local state for the editable fields so a save uses the LIVE values rather than the
+  // (possibly stale) image prop — this prevents lost updates when promoting to primary or changing
+  // the variant right after typing alt text (the API replaces altText + variant on every PUT).
+  const [altText, setAltText] = useState(image.altText ?? '')
+  const [variantId, setVariantId] = useState(image.productVariantId ?? GENERAL)
+
+  // Sends the current local state; `overrides` lets the just-changed field pass its new value
+  // before React state settles.
+  function save(
+    overrides: { altText?: string | null; variantId?: string | null; isPrimary?: boolean } = {},
+  ) {
     updateImage.mutate(
       {
         id: productId,
         imageId,
         body: {
-          altText: body.altText !== undefined ? body.altText : (image.altText ?? null),
+          altText: overrides.altText !== undefined ? overrides.altText : altText.trim() || null,
           productVariantId:
-            body.productVariantId !== undefined
-              ? body.productVariantId
-              : (image.productVariantId ?? null),
-          isPrimary: body.isPrimary,
+            overrides.variantId !== undefined ? overrides.variantId : variantId || null,
+          isPrimary: overrides.isPrimary,
         },
       },
       { onError: () => toast({ variant: 'destructive', title: 'Update failed' }) },
@@ -264,23 +267,27 @@ function GalleryRow({
         </div>
 
         <Input
-          defaultValue={image.altText ?? ''}
+          value={altText}
+          maxLength={200}
           placeholder="Alt text"
           className="w-full max-w-md"
           disabled={busy}
-          onBlur={(e) => {
-            const value = e.target.value.trim()
-            if (value !== (image.altText ?? '')) {
-              save({ altText: value || null })
+          onChange={(e) => setAltText(e.target.value)}
+          onBlur={() => {
+            if ((altText.trim() || null) !== (image.altText ?? null)) {
+              save()
             }
           }}
         />
 
         <VariantSelect
-          value={image.productVariantId ?? GENERAL}
+          value={variantId}
           variants={variants}
           disabled={busy}
-          onChange={(value) => save({ productVariantId: value || null })}
+          onChange={(value) => {
+            setVariantId(value)
+            save({ variantId: value || null })
+          }}
         />
       </div>
 

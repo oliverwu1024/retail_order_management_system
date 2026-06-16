@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Retail.Api.Common.Helpers;
@@ -233,7 +234,7 @@ public sealed class CatalogService : ICatalogService
             product.PrimaryImageBlobKey = blobKey;
         }
 
-        await _products.SaveChangesAsync(ct);
+        await SavePrimaryChangeAsync(ct);
         _logger.LogInformation("Added image {ImageId} to product {ProductId} (primary={Primary})", image.Id, product.Id, isPrimary);
         return product.ToDetailDto();
     }
@@ -265,7 +266,7 @@ public sealed class CatalogService : ICatalogService
             {
                 next.IsPrimary = true;
             }
-            await _products.SaveChangesAsync(ct);
+            await SavePrimaryChangeAsync(ct);
         }
 
         await tx.CommitAsync(ct);
@@ -335,7 +336,7 @@ public sealed class CatalogService : ICatalogService
 
             image.IsPrimary = true;
             product.PrimaryImageBlobKey = image.BlobKey;
-            await _products.SaveChangesAsync(ct);
+            await SavePrimaryChangeAsync(ct);
             await tx.CommitAsync(ct);
         }
         else
@@ -344,6 +345,21 @@ public sealed class CatalogService : ICatalogService
         }
 
         return product.ToDetailDto();
+    }
+
+    // Saves changes that set an image as primary. A concurrent writer setting the same product's
+    // primary loses the race on the filtered-unique index UX_ProductImage_Primary (SQL 2601/2627);
+    // surface that as a 409 to retry, not the catch-all 500 (mirrors OrderCreationService).
+    private async Task SavePrimaryChangeAsync(CancellationToken ct)
+    {
+        try
+        {
+            await _products.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw new ConflictException("Another image was set as the primary at the same time; please retry.");
+        }
     }
 
     // Rejects a variant id that doesn't belong to the product (or accepts null = general image).
@@ -410,6 +426,15 @@ public sealed class CatalogService : ICatalogService
         // Hard delete (its 1:1 inventory cascades). Safe in Phase 1 — no orders reference
         // variants yet; Phase 2 should switch to deactivation (IsActive=false) once they do.
         Product product = variant.Product!;
+
+        // Re-home this variant's images to GENERAL first. The variant→image FK is NoAction, so the
+        // images must stop referencing the variant before it's hard-deleted, or SQL raises an FK
+        // violation (the image rows themselves are still valid product images).
+        foreach (ProductImage image in product.Images.Where(i => i.ProductVariantId == variantId))
+        {
+            image.ProductVariantId = null;
+        }
+
         product.Variants.Remove(variant);
         await _products.SaveChangesAsync(ct);
 

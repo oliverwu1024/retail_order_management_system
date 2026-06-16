@@ -335,6 +335,58 @@ public class CatalogFlowTests
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task DeleteVariant_WithVariantImage_Succeeds_AndReHomesImageToGeneral()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string variantId = await AddVariantAsync(admin, productId, csrf, suffix);
+        (await UploadImageAsync(admin, productId, MinimalPng(), "image/png", "v.png", csrf, variantId: Guid.Parse(variantId)))
+            .EnsureSuccessStatusCode();
+
+        // Before the fix this 500'd (variant→image FK is NoAction and the images weren't detached).
+        HttpResponseMessage del = await DeleteAsync(admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}", csrf);
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+
+        // The image survives, re-homed to general (productVariantId null).
+        JsonElement detail = await DataAsync(await admin.GetAsync($"/api/v1/catalog/admin/products/{productId}"));
+        List<JsonElement> images = Images(detail);
+        Assert.Single(images);
+        // General image = productVariantId is null (the serializer omits null properties).
+        bool isGeneral = !images[0].TryGetProperty("productVariantId", out JsonElement pv)
+            || pv.ValueKind == JsonValueKind.Null;
+        Assert.True(isGeneral, "the re-homed image should have no variant association");
+    }
+
+    [Fact]
+    public async Task UpdateImage_AltTextTooLong_Returns422()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string imageId = await AddImageAsync(admin, productId, csrf, "a.png");
+
+        HttpResponseMessage resp = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/{imageId}",
+            new { altText = new string('x', 201) }, csrf);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddImage_AltTextTooLong_Returns422()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        HttpResponseMessage resp = await UploadImageAsync(
+            admin, productId, MinimalPng(), "image/png", "a.png", csrf, altText: new string('x', 201));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, string Csrf)> AdminClientAsync()
