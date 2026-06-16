@@ -258,6 +258,14 @@ try
     builder.Services.AddScoped<ICartRepository, CartRepository>();
     builder.Services.AddScoped<ICartService, CartService>();
 
+    // ── Inventory reservation (Story 2.3) ────────────────────────────────────
+    builder.Services.AddScoped<IInventoryReservationRepository, InventoryReservationRepository>();
+    builder.Services.AddScoped<IInventoryReservationService, InventoryReservationService>();
+
+    // Cart expiry sweeper: a background service runs the scoped sweep on a timer.
+    builder.Services.AddScoped<ICartSweepService, CartSweepService>();
+    builder.Services.AddHostedService<Retail.Api.HostedServices.CartExpirySweeper>();
+
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
     // catalogue reads — only an actual image upload.

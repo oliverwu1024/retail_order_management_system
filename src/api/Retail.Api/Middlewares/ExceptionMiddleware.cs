@@ -119,6 +119,14 @@ public class ExceptionMiddleware
             ConflictException =>
                 (StatusCodes.Status409Conflict, "CONFLICT", ex.Message),
 
+            // Not enough available stock (OnHand − Reserved) to satisfy a reservation/purchase.
+            OutOfStockException =>
+                (StatusCodes.Status409Conflict, "INVENTORY_INSUFFICIENT", ex.Message),
+
+            // A RowVersion-guarded ExecuteUpdate affected 0 rows — another writer won the race.
+            ConcurrencyException =>
+                (StatusCodes.Status409Conflict, "CONCURRENCY_CONFLICT", ex.Message),
+
             // EF Core raises this when an UPDATE/DELETE affects 0 rows because
             // another transaction beat us to it (optimistic concurrency via
             // a rowversion/timestamp column). 409 is the canonical mapping.
