@@ -7,6 +7,7 @@ type Schemas = components['schemas']
 export type ProductSummary = Schemas['ProductSummaryDto']
 export type ProductDetail = Schemas['ProductDetailDto']
 export type ProductVariant = Schemas['ProductVariantDto']
+export type ProductImage = Schemas['ProductImageDto']
 export type Category = Schemas['CategoryDto']
 export type ProductPage = Schemas['ProductSummaryDtoPagedResult']
 

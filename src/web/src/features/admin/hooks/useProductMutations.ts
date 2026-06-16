@@ -83,27 +83,47 @@ export function useDeleteProduct() {
   })
 }
 
-/**
- * Uploads/replaces a product's primary image.
- *
- * WHY THE bodySerializer DANCE?
- * openapi-fetch JSON-serializes bodies by default. For multipart/form-data we
- * override bodySerializer to build a FormData and return it — that makes the
- * browser set the multipart boundary Content-Type itself. The `body` value is
- * required (openapi-fetch skips a request body entirely when it's undefined),
- * so we pass the File through a cast; bodySerializer is what actually runs.
- */
-export function useUploadProductImage() {
+// After any gallery change, refresh both the public/admin product caches AND this product's
+// detail (the edit page reads images[] from the detail query).
+function useInvalidateGallery() {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateProducts()
+  return (productId: string) => {
+    invalidate()
+    void queryClient.invalidateQueries({ queryKey: adminProductKeys.detail(productId) })
+  }
+}
+
+/**
+ * Adds an image to a product's gallery (optionally scoped to a variant, with alt text).
+ *
+ * WHY THE bodySerializer DANCE?
+ * openapi-fetch JSON-serializes bodies by default. For multipart/form-data we override
+ * bodySerializer to build a FormData and return it — so the browser sets the multipart boundary
+ * Content-Type itself. The typed `body` only satisfies openapi-fetch's "has a body" check (it
+ * skips the body entirely when undefined); bodySerializer is what actually runs.
+ */
+export function useAddProductImage() {
+  const invalidateGallery = useInvalidateGallery()
   return useMutation({
-    mutationFn: async (vars: { id: string; file: File }): Promise<ProductDetail> => {
-      const { data, error } = await apiClient.POST('/api/v1/catalog/products/{id}/image', {
+    mutationFn: async (vars: {
+      id: string
+      file: File
+      variantId?: string | null
+      altText?: string | null
+    }): Promise<ProductDetail> => {
+      const { data, error } = await apiClient.POST('/api/v1/catalog/products/{id}/images', {
         params: { path: { id: vars.id } },
         body: { file: vars.file as unknown as string },
         bodySerializer: () => {
           const formData = new FormData()
           formData.append('file', vars.file)
+          if (vars.variantId) {
+            formData.append('variantId', vars.variantId)
+          }
+          if (vars.altText) {
+            formData.append('altText', vars.altText)
+          }
           return formData
         },
       })
@@ -112,9 +132,69 @@ export function useUploadProductImage() {
       }
       return data.data
     },
-    onSuccess: (_data, vars) => {
-      invalidate()
-      void queryClient.invalidateQueries({ queryKey: adminProductKeys.detail(vars.id) })
+    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+  })
+}
+
+/** Edits a gallery image (alt text, variant association, promote-to-primary). */
+export function useUpdateProductImage() {
+  const invalidateGallery = useInvalidateGallery()
+  return useMutation({
+    mutationFn: async (vars: {
+      id: string
+      imageId: string
+      body: Schemas['UpdateProductImageRequest']
+    }): Promise<ProductDetail> => {
+      const { data, error } = await apiClient.PUT(
+        '/api/v1/catalog/products/{id}/images/{imageId}',
+        {
+          params: { path: { id: vars.id, imageId: vars.imageId } },
+          body: vars.body,
+        },
+      )
+      if (error || !data?.data) {
+        throw new Error('Failed to update the image.')
+      }
+      return data.data
     },
+    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+  })
+}
+
+/** Reorders a product's gallery (the full set of image ids in display order). */
+export function useReorderProductImages() {
+  const invalidateGallery = useInvalidateGallery()
+  return useMutation({
+    mutationFn: async (vars: { id: string; imageIds: string[] }): Promise<ProductDetail> => {
+      const { data, error } = await apiClient.PUT('/api/v1/catalog/products/{id}/images/order', {
+        params: { path: { id: vars.id } },
+        body: { imageIds: vars.imageIds },
+      })
+      if (error || !data?.data) {
+        throw new Error('Failed to reorder the images.')
+      }
+      return data.data
+    },
+    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+  })
+}
+
+/** Deletes a gallery image (the next image is promoted to primary if needed). */
+export function useDeleteProductImage() {
+  const invalidateGallery = useInvalidateGallery()
+  return useMutation({
+    mutationFn: async (vars: { id: string; imageId: string }): Promise<ProductDetail> => {
+      const { data, error } = await apiClient.DELETE(
+        '/api/v1/catalog/products/{id}/images/{imageId}',
+        {
+          params: { path: { id: vars.id, imageId: vars.imageId } },
+        },
+      )
+      if (error || !data?.data) {
+        throw new Error('Failed to delete the image.')
+      }
+      return data.data
+    },
+    onSuccess: (_data, vars) => invalidateGallery(vars.id),
   })
 }

@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/hooks/use-toast'
 import { useCategoriesQuery } from '@/features/storefront/hooks/useCategoriesQuery'
 import type { ProductDetail } from '@/lib/api/types'
-import { ImageUploadField } from './components/ImageUploadField'
+import { ImageGalleryManager } from './components/ImageGalleryManager'
 import { ProductForm } from './components/ProductForm'
 import { VariantsSection } from './components/VariantsSection'
 import { useAdminProductQuery } from './hooks/useAdminProductQuery'
@@ -129,12 +129,14 @@ export function ProductFormPage() {
 
           {mode === 'edit' && productQuery.data ? (
             <>
-              <ImageUploadField
-                productId={productQuery.data.id!}
-                currentBlobKey={productQuery.data.primaryImageBlobKey}
-              />
               <VariantsSection
                 productId={productQuery.data.id!}
+                variants={productQuery.data.variants ?? []}
+              />
+              {/* Gallery after variants so the variant dropdown can scope images to a variant. */}
+              <ImageGalleryManager
+                productId={productQuery.data.id!}
+                images={productQuery.data.images ?? []}
                 variants={productQuery.data.variants ?? []}
               />
             </>
