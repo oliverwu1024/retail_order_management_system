@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Retail.Api.Data;
+using Retail.Api.Payments;
 using Testcontainers.Azurite;
 using Testcontainers.MsSql;
 
@@ -46,6 +50,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     private string _connectionString = string.Empty;
     private string _blobConnectionString = string.Empty;
+
+    /// <summary>Webhook signing secret used in the Testing environment — integration tests self-sign events with it.</summary>
+    internal const string TestWebhookSecret = "whsec_test_secret_for_integration_tests";
 
     /// <summary>xUnit calls this once before the class's tests: start SQL Server, migrate the schema.</summary>
     public async Task InitializeAsync()
@@ -94,7 +101,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Auth:DefaultAdmin:DisplayName"] = "Test Admin",
                 ["Storage:ConnectionString"] = _blobConnectionString,
                 ["Storage:ProductImagesContainer"] = "product-images",
+                ["Stripe:SecretKey"] = "sk_test_fake",
+                ["Stripe:WebhookSigningSecret"] = TestWebhookSecret,
             });
+        });
+
+        builder.ConfigureTestServices(services =>
+        {
+            // Swap the real Stripe gateway (which makes a network call) for a fake, so checkout
+            // tests stay hermetic. The webhook's signature check stays REAL — tests self-sign
+            // events with TestWebhookSecret.
+            services.RemoveAll<IStripeCheckoutGateway>();
+            services.AddScoped<IStripeCheckoutGateway, FakeStripeCheckoutGateway>();
         });
     }
 
