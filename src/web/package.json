@@ -9,6 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "gen:api": "openapi-typescript http://localhost:5124/swagger/v1/swagger.json -o src/lib/api/schema.d.ts",
@@ -35,10 +38,14 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tanstack/react-query-devtools": "^5.101.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10.5.0",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
@@ -46,12 +53,14 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jscpd": "^5.0.4",
+    "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.15",
     "prettier": "^3.8.3",
     "tailwindcss": "~3.4.19",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^4.1.9"
   }
 }
