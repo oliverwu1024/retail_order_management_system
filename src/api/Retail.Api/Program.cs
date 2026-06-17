@@ -337,6 +337,7 @@ try
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
+    builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
