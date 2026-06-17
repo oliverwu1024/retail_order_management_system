@@ -71,27 +71,51 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        # No tests exist yet (test projects are empty xUnit scaffolds).
-        # `dotnet test` exits 0 in that case, so this is a passing no-op
-        # today and a real gate the moment we write the first test.
-        run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=test-results.trx"
+      - name: Test (with coverage)
+        # Runs the full xUnit suite in Release and collects line/branch coverage
+        # via coverlet's XPlat collector (already referenced by both test
+        # projects). TRX + cobertura land under ./TestResults.
+        run: >
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=test-results.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Coverage report + 85% line gate
+        # Merges the per-project cobertura reports into one, surfaces the summary
+        # in the GitHub job summary, and FAILS the build when line coverage drops
+        # below 85% (currently ~95%). Branch coverage is reported, not gated.
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          reportgenerator \
+            "-reports:./TestResults/**/coverage.cobertura.xml" \
+            "-targetdir:./TestResults/coverage" \
+            "-reporttypes:TextSummary;Html;MarkdownSummaryGithub"
+          cat ./TestResults/coverage/Summary.txt
+          cat ./TestResults/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY" || true
+          line=$(grep -oP 'Line coverage:\s*\K[0-9.]+' ./TestResults/coverage/Summary.txt)
+          echo "Measured line coverage: ${line}%"
+          awk -v c="$line" 'BEGIN { exit (c + 0 >= 85 ? 0 : 1) }' \
+            || { echo "::error::Line coverage ${line}% is below the 85% gate"; exit 1; }
 
       - name: Upload test results
-        # Always upload, even on failure, so the .trx is available for
-        # post-mortem in the GitHub Actions UI.
+        # Always upload, even on failure, so the .trx + HTML coverage report are
+        # available for post-mortem in the GitHub Actions UI.
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: api-test-results
-          path: '**/TestResults/*.trx'
+          path: |
+            **/TestResults/*.trx
+            TestResults/coverage/**
           if-no-files-found: ignore
 
   # ───────────────────────────────────────────────────────────────────────────
   # Frontend · Vite + React SPA
   # ───────────────────────────────────────────────────────────────────────────
   web:
-    name: Web · typecheck + lint + build
+    name: Web · typecheck + lint + build + test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -130,8 +154,56 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # No `pnpm test` yet — Vitest tests land in Phase 1+. Add the step
-      # the moment we write the first test.
+      - name: Test (Vitest)
+        # Unit + component tests (jsdom). Fast, hermetic — no browser, no API.
+        run: pnpm test
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Frontend · Playwright end-to-end
+  # ───────────────────────────────────────────────────────────────────────────
+  #  A separate job: E2E needs a browser binary + a running web server, so it's
+  #  slower than the static web checks and worth isolating (independent failure
+  #  reporting, and it doesn't hold up the fast lint/build feedback). The suite
+  #  is hermetic — every /api/v1 call is stubbed via Playwright route mocking —
+  #  so no backend or database is required in CI.
+  e2e:
+    name: Web · E2E (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          version: 10
+
+      - name: Set up Node 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: src/web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        # --with-deps pulls the OS libraries Chromium needs on the runner.
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report
+          path: src/web/playwright-report
+          if-no-files-found: ignore
 
   # ───────────────────────────────────────────────────────────────────────────
   # Infrastructure · Bicep syntax check
