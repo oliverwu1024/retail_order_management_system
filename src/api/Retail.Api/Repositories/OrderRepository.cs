@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Retail.Api.Common.Enums;
 using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
 
@@ -66,6 +67,38 @@ public sealed class OrderRepository : IOrderRepository
             .Where(p => p.OrderId == orderId && p.AmountCents > 0 && p.StripePaymentIntentId != null)
             .Select(p => p.StripePaymentIntentId)
             .FirstOrDefaultAsync(ct);
+
+    /// <inheritdoc />
+    public async Task<bool> TryClaimForRefundAsync(
+        Guid orderId, Guid customerProfileId, DateTimeOffset now, string actor, CancellationToken ct)
+    {
+        // Atomic claim: only the writer who still sees the order as Paid wins. SQL Server
+        // serializes the row update, so a second concurrent cancel matches 0 rows (status is
+        // already Refunding) and loses the race. Set-based UPDATE bypasses the AuditingInterceptor,
+        // so we stamp the audit fields here (matching TryReserveAsync).
+        int affected = await _db.Orders
+            .Where(o => o.Id == orderId
+                     && o.CustomerProfileId == customerProfileId
+                     && o.Status == OrderStatus.Paid)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(o => o.Status, OrderStatus.Refunding)
+                    .SetProperty(o => o.UpdatedAt, now)
+                    .SetProperty(o => o.UpdatedBy, actor),
+                ct);
+        return affected == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task ReleaseRefundClaimAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct) =>
+        await _db.Orders
+            .Where(o => o.Id == orderId && o.Status == OrderStatus.Refunding)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(o => o.Status, OrderStatus.Paid)
+                    .SetProperty(o => o.UpdatedAt, now)
+                    .SetProperty(o => o.UpdatedBy, actor),
+                ct);
 
     /// <inheritdoc />
     public void AddOrder(Order order) =>

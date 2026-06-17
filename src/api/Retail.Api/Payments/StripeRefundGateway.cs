@@ -18,6 +18,10 @@ public sealed class StripeRefundGateway : IStripeRefundGateway
         var refundService = new RefundService(_stripe);
         await refundService.CreateAsync(
             new RefundCreateOptions { PaymentIntent = paymentIntentId },
-            cancellationToken: ct);
+            // Deterministic idempotency key (derived from the PaymentIntent) so a redelivered or
+            // racing refund request collapses to one actual refund at Stripe — defence-in-depth
+            // behind the Paid → Refunding claim in OrderCancellationService.
+            new RequestOptions { IdempotencyKey = $"refund:{paymentIntentId}" },
+            ct);
     }
 }

@@ -48,8 +48,13 @@ public sealed class OrderRefundService : IOrderRefundService
 
         if (order.Status == OrderStatus.Refunded)
         {
-            return; // idempotent — already reversed
+            return; // idempotent — already reversed (e.g. cancel applied it before this webhook)
         }
+
+        // Reaches here from Paid (refund initiated at Stripe) or Refunding (customer-cancel claim);
+        // both advance to Refunded below. Concurrent applies are serialized by Order.RowVersion on
+        // SaveChanges — the stale writer affects 0 rows and surfaces as a 409, so we never
+        // double-restock.
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
         string? actor = _currentUser.UserId; // null in the webhook

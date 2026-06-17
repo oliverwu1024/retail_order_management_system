@@ -32,6 +32,21 @@ public interface IOrderRepository
     /// <summary>The PaymentIntent id of an order's charge (positive payment), for issuing a refund. Null if none.</summary>
     Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct);
 
+    /// <summary>
+    /// Atomically claims an owned <c>Paid</c> order for refund by flipping it to
+    /// <c>Refunding</c>. Returns <c>true</c> only for the single caller whose set-based UPDATE
+    /// matched the still-<c>Paid</c> row; a concurrent cancel sees a non-Paid status and gets
+    /// <c>false</c> (0 rows). This is the TOCTOU guard that ensures exactly one writer reaches
+    /// Stripe (cf. <c>InventoryReservationRepository.TryReserveAsync</c>).
+    /// </summary>
+    Task<bool> TryClaimForRefundAsync(Guid orderId, Guid customerProfileId, DateTimeOffset now, string actor, CancellationToken ct);
+
+    /// <summary>
+    /// Best-effort rollback of a refund claim (<c>Refunding</c> → <c>Paid</c>) when the Stripe
+    /// refund call fails, so the order stays cancellable. Scoped to the still-<c>Refunding</c> row.
+    /// </summary>
+    Task ReleaseRefundClaimAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct);
+
     /// <summary>Stages a new order (with its lines, breakdown, and payment graph) for insert.</summary>
     void AddOrder(Order order);
 

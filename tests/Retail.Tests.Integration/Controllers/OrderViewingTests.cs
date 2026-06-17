@@ -106,6 +106,46 @@ public class OrderViewingTests
         Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task ConcurrentCancel_RefundsOnce_RestocksOnce_AndLoserGets409()
+    {
+        // Two simultaneous cancels on the same paid order. The Paid → Refunding claim must let
+        // exactly one win, so Stripe is hit once, stock is restocked once, and the loser gets 409.
+        (HttpClient client, string csrf, Guid profileId) = await RegisterCustomerAsync();
+        string paymentIntentId = $"pi_test_{Guid.NewGuid():N}";
+        (Guid orderId, Guid variantId) = await SeedOrderAsync(
+            profileId, status: OrderStatus.Paid, onHand: 3, quantity: 2, paymentIntentId: paymentIntentId);
+
+        HttpResponseMessage[] responses = await Task.WhenAll(
+            PostJsonAsync(client, $"/api/v1/orders/{orderId}/cancel", new { }, csrf),
+            PostJsonAsync(client, $"/api/v1/orders/{orderId}/cancel", new { }, csrf));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));        // exactly one winner
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.Conflict));  // loser gets a clean 409
+        Assert.Equal(1, FakeStripeRefundGateway.RefundCountFor(paymentIntentId));        // refunded once, not twice
+        Assert.Equal(5, await ReadOnHandAsync(variantId));                               // 3 + 2 restocked exactly once
+    }
+
+    [Fact]
+    public async Task ListMyOrders_AcceptsPascalCaseAndLowercasePaging()
+    {
+        (HttpClient client, _, Guid profileId) = await RegisterCustomerAsync();
+        await SeedOrderAsync(profileId, status: OrderStatus.Paid);
+        await SeedOrderAsync(profileId, status: OrderStatus.Paid);
+        await SeedOrderAsync(profileId, status: OrderStatus.Paid);
+
+        // PascalCase (the documented DTO contract) bounds the page to 2 items...
+        JsonElement pascal = (await (await client.GetAsync("/api/v1/orders?Page=1&PageSize=2"))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Equal(2, pascal.GetProperty("items").GetArrayLength());
+        Assert.Equal(3, pascal.GetProperty("totalCount").GetInt32());
+
+        // ...and lowercase still binds (query-string binding is case-insensitive) → no hard break.
+        JsonElement lower = (await (await client.GetAsync("/api/v1/orders?page=1&pageSize=2"))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("data");
+        Assert.Equal(2, lower.GetProperty("items").GetArrayLength());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, string Csrf, Guid ProfileId)> RegisterCustomerAsync()
@@ -129,7 +169,8 @@ public class OrderViewingTests
         int onHand = 5,
         int quantity = 1,
         bool withCharge = false,
-        string? sessionId = null)
+        string? sessionId = null,
+        string? paymentIntentId = null)
     {
         string suffix = Guid.NewGuid().ToString("N")[..8];
         using IServiceScope scope = _factory.Services.CreateScope();
@@ -177,13 +218,13 @@ public class OrderViewingTests
             SkuSnapshot = variant.Sku,
             NameSnapshot = product.Name,
         });
-        if (withCharge || sessionId is not null)
+        if (withCharge || sessionId is not null || paymentIntentId is not null)
         {
             order.Payments.Add(new Payment
             {
                 Provider = "stripe",
                 StripeSessionId = sessionId,
-                StripePaymentIntentId = withCharge ? $"pi_test_{suffix}" : null,
+                StripePaymentIntentId = paymentIntentId ?? (withCharge ? $"pi_test_{suffix}" : null),
                 AmountCents = PriceCents * quantity,
                 Currency = "AUD",
                 Status = PaymentStatus.Succeeded,

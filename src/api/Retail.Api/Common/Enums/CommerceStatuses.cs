@@ -65,8 +65,8 @@ public enum ReservationStatus : byte
 
 /// <summary>
 /// Lifecycle of an <c>Order</c>. Phase 2 drives Pending → Paid (webhook) and the
-/// customer-cancel path Pending → Cancelled / Paid → Refunded. Fulfilled is set by
-/// the Phase 3 staff "Mark Shipped" flow.
+/// customer-cancel path Pending → Cancelled / Paid → <see cref="Refunding"/> → Refunded.
+/// Fulfilled is set by the Phase 3 staff "Mark Shipped" flow.
 /// </summary>
 public enum OrderStatus : byte
 {
@@ -84,6 +84,15 @@ public enum OrderStatus : byte
 
     /// <summary>Paid then refunded — inventory rolled back.</summary>
     Refunded = 5,
+
+    /// <summary>
+    /// Transient "refund in progress" claim. The customer-cancel flow atomically flips
+    /// Paid → Refunding BEFORE calling Stripe, so exactly one writer reaches the refund API
+    /// (a concurrent cancel loses the claim and gets a 409). On a successful Stripe refund the
+    /// state advances to <see cref="Refunded"/>; if the Stripe call fails it is rolled back to
+    /// <see cref="Paid"/> so the order stays cancellable. Appended as 6 — never renumber.
+    /// </summary>
+    Refunding = 6,
 }
 
 /// <summary>
