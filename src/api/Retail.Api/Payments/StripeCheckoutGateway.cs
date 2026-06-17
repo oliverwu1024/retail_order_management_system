@@ -10,17 +10,19 @@ namespace Retail.Api.Payments;
 /// <remarks>
 /// Builds a <see cref="StripeClient"/> from the configured secret key (rather than the global
 /// static <c>StripeConfiguration.ApiKey</c>) so the credential is instance-scoped and easy to
-/// reason about. If the key is blank the client still constructs — the failure surfaces only
-/// when a real call is made, which is the intended "checkout is optional until configured"
-/// behaviour.
+/// reason about. The client is built LAZILY: Stripe.net's <c>StripeClient</c> ctor rejects an empty
+/// key, so constructing eagerly would break every action on a controller that injects this gateway
+/// (even ones that never call Stripe) when no key is configured. Deferring to first use makes the
+/// intended "checkout is optional until configured" behaviour actually hold — the failure surfaces
+/// only when a real checkout call is made.
 /// </remarks>
 public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
 {
-    private readonly IStripeClient _stripe;
+    private readonly Lazy<IStripeClient> _stripe;
 
     public StripeCheckoutGateway(IOptions<StripeOptions> options)
     {
-        _stripe = new StripeClient(options.Value.SecretKey);
+        _stripe = new Lazy<IStripeClient>(() => new StripeClient(options.Value.SecretKey));
     }
 
     public async Task<StripeCheckoutSession> CreateCheckoutSessionAsync(CheckoutSessionRequest request, CancellationToken ct)
@@ -54,7 +56,7 @@ public sealed class StripeCheckoutGateway : IStripeCheckoutGateway
                 .ToList(),
         };
 
-        var sessionService = new SessionService(_stripe);
+        var sessionService = new SessionService(_stripe.Value);
         Session session = await sessionService.CreateAsync(createOptions, cancellationToken: ct);
         return new StripeCheckoutSession(session.Id, session.Url);
     }
