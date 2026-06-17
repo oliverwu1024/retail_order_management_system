@@ -24,3 +24,7 @@ export type OrderPage = Schemas['OrderSummaryDtoPagedResult']
 
 export type AdminUser = Schemas['AdminUserDto']
 export type AdminUserPage = Schemas['AdminUserDtoPagedResult']
+
+export type AdminOrderSummary = Schemas['AdminOrderSummaryDto']
+export type AdminOrderDetail = Schemas['AdminOrderDetailDto']
+export type AdminOrderPage = Schemas['AdminOrderSummaryDtoPagedResult']

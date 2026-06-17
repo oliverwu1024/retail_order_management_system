@@ -5,6 +5,8 @@ import { StorefrontShell } from '@/components/layouts/StorefrontShell'
 import { AccountPage } from '@/features/account/AccountPage'
 import { AdminComingSoon } from '@/features/admin/AdminComingSoonPage'
 import { AdminHomePage } from '@/features/admin/AdminHomePage'
+import { AdminOrderDetailPage } from '@/features/admin/AdminOrderDetailPage'
+import { AdminOrdersPage } from '@/features/admin/AdminOrdersPage'
 import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
 import { ProductFormPage } from '@/features/admin/ProductFormPage'
 import { UsersPage } from '@/features/admin/UsersPage'
@@ -86,10 +88,15 @@ export const router = createBrowserRouter([
         path: 'orders',
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.orders}>
-            <AdminComingSoon
-              title="Orders"
-              note="The order workbench (list, fulfil, refund) lands in Chunk 2."
-            />
+            <AdminOrdersPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: 'orders/:id',
+        element: (
+          <RoleGuard allowedRoles={ROLE_SETS.orders}>
+            <AdminOrderDetailPage />
           </RoleGuard>
         ),
       },
