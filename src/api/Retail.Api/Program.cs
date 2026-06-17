@@ -14,6 +14,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Retail.Api.Common.Abstractions;
 using Retail.Api.Common.Constants;
+using Retail.Api.Common.Helpers;
 using Retail.Api.Data;
 using Retail.Api.Data.Interceptors;
 using Retail.Api.Domain.Entities;
@@ -24,6 +25,7 @@ using Retail.Api.Repositories;
 using Retail.Api.Services;
 using Retail.Api.Storage;
 using Serilog;
+using Serilog.Events;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Program.cs — composition root for Retail.Api.
@@ -403,7 +405,12 @@ try
         .AddOpenTelemetry()
         .ConfigureResource(r => r.AddService(serviceName: "Retail.Api"))
         .WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation()
+            .AddAspNetCoreInstrumentation(options =>
+                // SECURITY: mask the guest-order session id (a bearer token) out of the span's
+                // url.path so it doesn't persist to the trace backend. http.route already carries
+                // only the safe template (.../by-session/{sessionId}). (P2-S2)
+                options.EnrichWithHttpRequest = (activity, request) =>
+                    activity.SetTag("url.path", LogPathSanitizer.Sanitize(request.Path.Value)))
             .AddEntityFrameworkCoreInstrumentation()
             .AddConsoleExporter())
         .WithMetrics(metrics => metrics
@@ -465,7 +472,21 @@ try
     //    method, path, status, elapsed ms. Sits after ExceptionMiddleware so
     //    that even failed requests get a log line (the exception middleware
     //    doesn't short-circuit logging — it just shapes the response body).
-    app.UseSerilogRequestLogging();
+    //
+    //    SECURITY: the guest-order lookup carries the Stripe session id (an
+    //    unguessable bearer token) in the URL path. We mask it on the {RequestPath}
+    //    property by overriding GetMessageTemplateProperties — NOT
+    //    EnrichDiagnosticContext, because Serilog.AspNetCore appends its OWN
+    //    (unmasked) RequestPath after enrichers and that value wins on last-write.
+    app.UseSerilogRequestLogging(options =>
+        options.GetMessageTemplateProperties = (httpContext, requestPath, elapsedMs, statusCode) =>
+            new[]
+            {
+                new LogEventProperty("RequestMethod", new ScalarValue(httpContext.Request.Method)),
+                new LogEventProperty("RequestPath", new ScalarValue(LogPathSanitizer.Sanitize(requestPath))),
+                new LogEventProperty("StatusCode", new ScalarValue(statusCode)),
+                new LogEventProperty("Elapsed", new ScalarValue(elapsedMs)),
+            });
 
     // 3. Swagger in dev only. Production exposes no API browser surface.
     if (app.Environment.IsDevelopment())

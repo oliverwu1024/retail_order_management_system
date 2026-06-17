@@ -1,5 +1,7 @@
 using System.Text.Json;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Retail.Api.Common.Helpers;
 using Retail.Api.Common.Models;
 using Retail.Api.Exceptions;
 
@@ -135,6 +137,15 @@ public class ExceptionMiddleware
                  "CONCURRENCY_CONFLICT",
                  "The record was modified by another user. Please refresh and try again."),
 
+            // A SQL Server unique/PK violation (2601/2627) — e.g. two concurrent first-adds
+            // racing the one-open-cart-per-owner index. A conflict, not a 500: the winning row
+            // now exists, so the client can simply retry. (EF surfaces this as a plain
+            // DbUpdateException, distinct from the 0-rows DbUpdateConcurrencyException above.)
+            DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } =>
+                (StatusCodes.Status409Conflict,
+                 "CONFLICT",
+                 "That action conflicted with a concurrent change. Please try again."),
+
             // Thrown by [Authorize] policy handlers and by any code path that
             // explicitly rejects an authenticated principal. Distinct from
             // a missing-token case, which the auth middleware handles with
@@ -174,7 +185,9 @@ public class ExceptionMiddleware
             "Unhandled exception {ErrorCode} on {Method} {Path} → {StatusCode}",
             code,
             context.Request.Method,
-            context.Request.Path.Value,
+            // Mask any bearer-bearing path segment (e.g. the guest order-lookup session id), which
+            // 404s on every success-page poll and would otherwise leak here. (P2-S2)
+            LogPathSanitizer.Sanitize(context.Request.Path.Value),
             status);
 
         // Build the failure envelope. In Development we include the exception
