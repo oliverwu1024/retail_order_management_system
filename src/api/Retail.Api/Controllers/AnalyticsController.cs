@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Retail.Api.Common.Constants;
 using Retail.Api.Common.Models;
+using Retail.Api.Common.Validation;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
 using Retail.Api.Services;
@@ -31,10 +32,19 @@ public sealed class AnalyticsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<SalesReportDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> SalesByDay([FromQuery] SalesByDayQuery query, CancellationToken ct)
     {
         DateTimeOffset to = query.To ?? _timeProvider.GetUtcNow();
         DateTimeOffset from = query.From ?? to.AddDays(-30);
+
+        // Validate the EFFECTIVE range (after defaulting), so an only-`from` request can't widen the
+        // window to "now". Reject a reversed range, and cap the span to bound the in-memory aggregation.
+        if (DateRangeGuard.Validate(from, to, maxSpanDays: 366) is { } invalid)
+        {
+            return UnprocessableEntity(invalid);
+        }
+
         SalesReportDto report = await _reports.GetSalesByDayAsync(from, to, ct);
         return Ok(ApiResponse<SalesReportDto>.Ok(report));
     }

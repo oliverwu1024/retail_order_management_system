@@ -62,6 +62,24 @@ public class ReportsTests
         Assert.Equal(3000, categories.Single(c => c.GetProperty("category").GetString() == catB).GetProperty("totalSalesCents").GetInt64());
     }
 
+    [Fact]
+    public async Task SalesByDay_ReversedRange_Returns422()
+    {
+        (HttpClient staff, _) = await StaffClientAsync();
+        HttpResponseMessage resp = await staff.GetAsync(
+            "/api/v1/analytics/sales-by-day?From=2099-06-10T00:00:00Z&To=2099-06-01T00:00:00Z");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task SalesByDay_RangeTooWide_Returns422()
+    {
+        (HttpClient staff, _) = await StaffClientAsync();
+        HttpResponseMessage resp = await staff.GetAsync(
+            "/api/v1/analytics/sales-by-day?From=2090-01-01T00:00:00Z&To=2099-01-01T00:00:00Z");
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task SeedPaidOrderAsync(DateTimeOffset placedAt, string categoryName, int priceCents)

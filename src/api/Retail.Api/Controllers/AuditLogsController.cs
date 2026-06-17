@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Retail.Api.Common.Constants;
 using Retail.Api.Common.Models;
+using Retail.Api.Common.Validation;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
 using Retail.Api.Services;
@@ -30,8 +31,14 @@ public sealed class AuditLogsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AuditLogDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Search([FromQuery] AuditLogListQuery query, CancellationToken ct)
     {
+        if (DateRangeGuard.Validate(query.From, query.To) is { } invalid)
+        {
+            return UnprocessableEntity(invalid);
+        }
+
         PagedResult<AuditLogDto> result = await _audit.SearchAsync(query, ct);
         return Ok(ApiResponse<PagedResult<AuditLogDto>>.Ok(result));
     }

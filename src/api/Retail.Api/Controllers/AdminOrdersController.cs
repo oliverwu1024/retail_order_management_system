@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Retail.Api.Common.Constants;
 using Retail.Api.Common.Models;
+using Retail.Api.Common.Validation;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
 using Retail.Api.Services;
@@ -36,8 +37,14 @@ public sealed class AdminOrdersController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<PagedResult<AdminOrderSummaryDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> ListOrders([FromQuery] AdminOrderListQuery query, CancellationToken ct)
     {
+        if (DateRangeGuard.Validate(query.From, query.To) is { } invalid)
+        {
+            return UnprocessableEntity(invalid);
+        }
+
         PagedResult<AdminOrderSummaryDto> result = await _orders.ListAsync(query, ct);
         return Ok(ApiResponse<PagedResult<AdminOrderSummaryDto>>.Ok(result));
     }

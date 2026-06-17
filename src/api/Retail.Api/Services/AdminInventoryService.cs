@@ -35,10 +35,15 @@ public sealed class AdminInventoryService : IAdminInventoryService
 
         int before = item.OnHand;
         int after = before + request.Delta;
-        if (after < 0)
+        // Reject anything that would make AVAILABLE (= OnHand − Reserved) negative, not merely
+        // OnHand < 0. Reserved units are already promised to in-flight checkouts; letting on-hand
+        // drop below them oversells and breaks the ledger when those reservations commit
+        // (CommitReservedAsync subtracts unconditionally). With Reserved = 0 this is the on-hand ≥ 0 guard.
+        if (after < item.Reserved)
         {
             throw new ConflictException(
-                $"Adjustment would take on-hand below zero (current {before}, delta {request.Delta}).");
+                $"Adjustment would leave on-hand ({after}) below reserved stock ({item.Reserved}), "
+                + $"making available negative (current on-hand {before}, reserved {item.Reserved}, delta {request.Delta}).");
         }
 
         item.OnHand = after;

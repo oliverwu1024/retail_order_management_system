@@ -207,6 +207,10 @@ public sealed class AdminOrderService : IAdminOrderService
     }
 
     // A blank or unrecognised status filter means "all" (lenient — it's a filter, not a command).
+    // Enum.IsDefined rejects in-range-but-undefined inputs (e.g. "99" or a flags-style combo) that
+    // TryParse would otherwise accept and silently turn into an always-empty page.
     private static OrderStatus? ParseStatus(string? status) =>
-        Enum.TryParse(status, ignoreCase: true, out OrderStatus parsed) ? parsed : null;
+        Enum.TryParse(status, ignoreCase: true, out OrderStatus parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : null;
 }

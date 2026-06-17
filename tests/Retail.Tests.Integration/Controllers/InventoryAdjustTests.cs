@@ -74,9 +74,21 @@ public class InventoryAdjustTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
     }
 
+    [Fact]
+    public async Task Adjust_BelowReserved_Returns409()
+    {
+        // OnHand 5, Reserved 5 (all promised to in-flight checkouts) → a −3 delta would leave
+        // OnHand 2 < Reserved 5, i.e. Available −3. Must be rejected even though OnHand stays positive.
+        (Guid variantId, _) = await SeedVariantAsync(onHand: 5, reserved: 5);
+        (HttpClient staff, string csrf) = await StaffClientAsync();
+        HttpResponseMessage resp = await PostJsonAsync(
+            staff, $"/api/v1/admin/inventory/{variantId}/adjust", new { delta = -3, reason = "Damage" }, csrf);
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
-    private async Task<(Guid VariantId, Guid ItemId)> SeedVariantAsync(int onHand)
+    private async Task<(Guid VariantId, Guid ItemId)> SeedVariantAsync(int onHand, int reserved = 0)
     {
         string suffix = Guid.NewGuid().ToString("N")[..8];
         using IServiceScope scope = _factory.Services.CreateScope();
@@ -99,7 +111,7 @@ public class InventoryAdjustTests
             PriceCents = 1999,
             IsActive = true,
         };
-        var inventory = new InventoryItem { Variant = variant, OnHand = onHand };
+        var inventory = new InventoryItem { Variant = variant, OnHand = onHand, Reserved = reserved };
 
         db.AddRange(category, product, variant, inventory);
         await db.SaveChangesAsync();
