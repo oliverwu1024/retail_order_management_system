@@ -99,6 +99,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Auth:DefaultAdmin:Email"] = "admin@test.local",
                 ["Auth:DefaultAdmin:Password"] = "TestAdmin123456",
                 ["Auth:DefaultAdmin:DisplayName"] = "Test Admin",
+                // Demo back-office accounts (seeded outside Production) — the RBAC tests log into these.
+                ["Auth:DemoStaff:Email"] = "staff@test.local",
+                ["Auth:DemoStaff:Password"] = "TestStaff123456",
+                ["Auth:DemoStaff:DisplayName"] = "Test Staff",
+                ["Auth:DemoManager:Email"] = "manager@test.local",
+                ["Auth:DemoManager:Password"] = "TestManager123456",
+                ["Auth:DemoManager:DisplayName"] = "Test Manager",
                 ["Storage:ConnectionString"] = _blobConnectionString,
                 ["Storage:ProductImagesContainer"] = "product-images",
                 ["Stripe:SecretKey"] = "sk_test_fake",

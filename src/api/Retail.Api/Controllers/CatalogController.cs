@@ -84,7 +84,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Paged product list for admin management — includes unpublished products.</summary>
     [HttpGet("admin/products")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<ProductSummaryDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ListProductsForAdmin([FromQuery] ProductListQuery query, CancellationToken ct)
     {
@@ -94,7 +94,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Product detail by id for the admin edit form — works for unpublished products.</summary>
     [HttpGet("admin/products/{id:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetProductForAdmin(Guid id, CancellationToken ct)
@@ -107,7 +107,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Creates a category.</summary>
     [HttpPost("categories")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest request, CancellationToken ct)
     {
@@ -122,7 +122,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Creates a product (variants added separately).</summary>
     [HttpPost("products")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request, CancellationToken ct)
@@ -138,7 +138,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Updates a product's fields (not its SKU).</summary>
     [HttpPut("products/{id:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProduct(Guid id, [FromBody] UpdateProductRequest request, CancellationToken ct)
@@ -154,7 +154,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Soft-deletes a product (recoverable; hidden from the storefront).</summary>
     [HttpDelete("products/{id:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteProduct(Guid id, CancellationToken ct)
@@ -170,7 +170,7 @@ public sealed class CatalogController : ControllerBase
     // RequestSizeLimit/RequestFormLimits reject an oversized body at the framework edge,
     // BEFORE model binding buffers it — so the 5 MB cap isn't only enforced post-buffer.
     [HttpPost("products/{id:guid}/images")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [RequestSizeLimit(ImageFormat.MaxBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = ImageFormat.MaxBytes)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
@@ -199,7 +199,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Reorders a product's gallery (body = the full set of image ids in display order).</summary>
     [HttpPut("products/{id:guid}/images/order")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
@@ -211,7 +211,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Edits a gallery image (alt text, variant association, promote-to-primary).</summary>
     [HttpPut("products/{id:guid}/images/{imageId:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
@@ -228,7 +228,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Deletes a gallery image (promotes the next image to primary if it was the primary).</summary>
     [HttpDelete("products/{id:guid}/images/{imageId:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteProductImage(Guid id, Guid imageId, CancellationToken ct)
@@ -239,7 +239,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Adds a variant (and its initial stock) to a product.</summary>
     [HttpPost("products/{id:guid}/variants")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductVariantDto>), StatusCodes.Status201Created)]
     public async Task<IActionResult> AddVariant(Guid id, [FromBody] CreateVariantRequest request, CancellationToken ct)
     {
@@ -254,7 +254,7 @@ public sealed class CatalogController : ControllerBase
 
     /// <summary>Updates a variant's options/price/active flag.</summary>
     [HttpPut("products/{id:guid}/variants/{variantId:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse<ProductVariantDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateVariant(Guid id, Guid variantId, [FromBody] UpdateVariantRequest request, CancellationToken ct)
     {
@@ -273,7 +273,7 @@ public sealed class CatalogController : ControllerBase
     /// the variant update endpoint (IsActive=true). Idempotent.
     /// </summary>
     [HttpDelete("products/{id:guid}/variants/{variantId:guid}")]
-    [Authorize(Roles = Roles.Administrator)]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteVariant(Guid id, Guid variantId, CancellationToken ct)
     {

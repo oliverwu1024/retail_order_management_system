@@ -334,6 +334,9 @@ try
     builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
     builder.Services.AddScoped<IOrderCancellationService, OrderCancellationService>();
 
+    // ── Admin operations (Phase 3) ──────────────────────────────────────────
+    builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
     // catalogue reads — only an actual image upload.
