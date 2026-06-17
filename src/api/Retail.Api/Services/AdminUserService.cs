@@ -15,8 +15,9 @@ namespace Retail.Api.Services;
 /// Role authority (who may create whom) is a CONTROLLER concern — this service just performs the
 /// requested create/list. New accounts are created <c>EmailConfirmed</c> (an admin vouches for
 /// them), and the <c>AuditingInterceptor</c> stamps <c>CreatedBy</c> with the acting admin's id
-/// automatically — and, since <c>ApplicationUser</c> is a monitored entity, the AuditTrailInterceptor
-/// records an Insert row for the new account.
+/// automatically. NOTE: account rows are deliberately NOT in the AuditTrailInterceptor's monitored
+/// set (REQUIREMENTS §11.1 lists Product/Inventory/Order/Payment/Shipment), so no before/after audit
+/// row is written for user CRUD — which also avoids serialising Identity's email/normalized columns.
 /// </remarks>
 public sealed class AdminUserService : IAdminUserService
 {
