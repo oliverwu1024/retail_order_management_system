@@ -52,12 +52,18 @@ export function AdminOrderDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Panel title="Items">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm" aria-label="Order items">
               <thead className="border-b text-left text-muted-foreground">
                 <tr>
-                  <th className="py-2 font-medium">Item</th>
-                  <th className="py-2 font-medium">Qty</th>
-                  <th className="py-2 text-right font-medium">Total</th>
+                  <th scope="col" className="py-2 font-medium">
+                    Item
+                  </th>
+                  <th scope="col" className="py-2 font-medium">
+                    Qty
+                  </th>
+                  <th scope="col" className="py-2 text-right font-medium">
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -144,8 +150,8 @@ export function AdminOrderDetailPage() {
 function OrderActions({ order, canRefund }: { order: AdminOrderDetail; canRefund: boolean }) {
   const id = order.id ?? ''
   const markDelivered = useMarkDelivered()
-  const refund = useRefundOrder()
   const [shipOpen, setShipOpen] = useState(false)
+  const [refundOpen, setRefundOpen] = useState(false)
 
   const status = order.status
   const shipmentStatus = order.shipment?.status
@@ -158,7 +164,7 @@ function OrderActions({ order, canRefund }: { order: AdminOrderDetail; canRefund
     })
   }
 
-  const busy = markDelivered.isPending || refund.isPending
+  const busy = markDelivered.isPending
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -180,23 +186,7 @@ function OrderActions({ order, canRefund }: { order: AdminOrderDetail; canRefund
       ) : null}
 
       {canRefund && status === 'Paid' ? (
-        <Button
-          variant="destructive"
-          disabled={busy}
-          onClick={() => {
-            if (
-              !window.confirm(
-                `Refund order #${order.orderNumber}? This refunds the customer and restocks the items.`,
-              )
-            ) {
-              return
-            }
-            refund.mutate(
-              { id },
-              { onSuccess: () => toast({ title: 'Order refunded' }), onError: notifyError },
-            )
-          }}
-        >
+        <Button variant="destructive" onClick={() => setRefundOpen(true)}>
           Refund
         </Button>
       ) : null}
@@ -207,7 +197,66 @@ function OrderActions({ order, canRefund }: { order: AdminOrderDetail; canRefund
         open={shipOpen}
         onOpenChange={setShipOpen}
       />
+      <RefundModal
+        id={id}
+        orderNumber={order.orderNumber ?? 0}
+        totalCents={order.totalCents ?? 0}
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+      />
     </div>
+  )
+}
+
+function RefundModal({
+  id,
+  orderNumber,
+  totalCents,
+  open,
+  onOpenChange,
+}: {
+  id: string
+  orderNumber: number
+  totalCents: number
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const refund = useRefundOrder()
+
+  function onConfirm() {
+    refund.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          toast({ title: 'Order refunded' })
+          onOpenChange(false)
+        },
+        onError: (error) =>
+          toast({
+            variant: 'destructive',
+            title: 'Couldn’t refund',
+            description: error instanceof Error ? error.message : undefined,
+          }),
+      },
+    )
+  }
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Refund order #${orderNumber}`}
+      description={`This refunds the customer ${formatCents(totalCents)} and restocks the items. This can’t be undone.`}
+    >
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button type="button" variant="destructive" disabled={refund.isPending} onClick={onConfirm}>
+          {refund.isPending ? 'Refunding…' : `Refund ${formatCents(totalCents)}`}
+        </Button>
+      </div>
+    </Modal>
   )
 }
 

@@ -17,6 +17,8 @@ interface DataTableProps<T> {
   getRowKey: (row: T) => string
   /** Rendered in place of the table when there are no rows. */
   empty?: ReactNode
+  /** Accessible name for the table (screen-reader label) — e.g. "Users", "Orders". */
+  label?: string
 }
 
 /**
@@ -25,18 +27,18 @@ interface DataTableProps<T> {
  * minimal (no built-in sort/virtualisation, no heavy dependency) so it stays a reusable building
  * block the admin pages compose rather than each hand-rolling a <table>.
  */
-export function DataTable<T>({ columns, rows, getRowKey, empty }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, getRowKey, empty, label }: DataTableProps<T>) {
   if (rows.length === 0 && empty !== undefined) {
     return <>{empty}</>
   }
 
   return (
     <div className="overflow-x-auto rounded-md border">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" aria-label={label}>
         <thead className="border-b bg-muted/50 text-left text-muted-foreground">
           <tr>
             {columns.map((col) => (
-              <th key={col.key} className={cn('px-3 py-2 font-medium', col.className)}>
+              <th key={col.key} scope="col" className={cn('px-3 py-2 font-medium', col.className)}>
                 {col.header}
               </th>
             ))}

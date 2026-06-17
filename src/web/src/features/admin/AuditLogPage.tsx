@@ -87,6 +87,7 @@ export function AuditLogPage() {
       ) : (
         <>
           <DataTable
+            label="Audit log"
             columns={columns}
             rows={data?.items ?? []}
             getRowKey={(row) => String(row.id)}

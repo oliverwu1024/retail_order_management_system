@@ -107,6 +107,7 @@ export function AdminOrdersPage() {
       ) : (
         <>
           <DataTable
+            label="Orders"
             columns={columns}
             rows={data?.items ?? []}
             getRowKey={(order) => order.id ?? ''}

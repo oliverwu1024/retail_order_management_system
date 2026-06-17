@@ -70,6 +70,7 @@ export function UsersPage() {
       ) : (
         <>
           <DataTable
+            label="Users"
             columns={columns}
             rows={data?.items ?? []}
             getRowKey={(user) => user.id ?? user.email ?? ''}

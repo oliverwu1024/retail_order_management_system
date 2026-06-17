@@ -51,10 +51,11 @@ export function ReportsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} width={56} tickFormatter={(value) => `$${value}`} />
-                <Tooltip />
+                <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
                 <Line
                   type="monotone"
                   dataKey="total"
+                  name="Sales"
                   stroke="#6366f1"
                   strokeWidth={2}
                   dot={false}

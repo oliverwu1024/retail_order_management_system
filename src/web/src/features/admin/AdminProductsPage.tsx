@@ -135,6 +135,7 @@ export function AdminProductsPage() {
       ) : (
         <>
           <DataTable
+            label="Products"
             columns={columns}
             rows={data?.items ?? []}
             getRowKey={(product) => product.id ?? ''}

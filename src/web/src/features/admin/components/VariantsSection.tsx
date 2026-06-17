@@ -297,8 +297,9 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
 
 /**
  * Stock-adjustment modal: a signed delta + a reason, posted to the inventory-adjust endpoint.
- * The delta must be a non-zero integer and the reason non-empty (mirrors the server validator);
- * the reason is recorded in the audit log.
+ * Client validation mirrors the server validator (delta a non-zero integer; reason non-empty and
+ * ≤ 200 chars) so an over-long reason is caught before the request instead of bouncing as a 422.
+ * The reason is recorded in the audit log.
  */
 function AdjustStockModal({
   productId,
@@ -314,11 +315,13 @@ function AdjustStockModal({
   const [reason, setReason] = useState('')
 
   const parsedDelta = Number(delta)
+  const trimmedReason = reason.trim()
   const valid =
     delta.trim() !== '' &&
     Number.isInteger(parsedDelta) &&
     parsedDelta !== 0 &&
-    reason.trim().length > 0
+    trimmedReason.length > 0 &&
+    trimmedReason.length <= 200
 
   function onSubmit() {
     if (!valid || !variant.id) {
@@ -366,6 +369,7 @@ function AdjustStockModal({
             id="adjust-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            maxLength={200}
             placeholder="Cycle count, damage, restock…"
           />
         </div>
