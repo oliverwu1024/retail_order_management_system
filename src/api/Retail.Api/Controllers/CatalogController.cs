@@ -174,6 +174,7 @@ public sealed class CatalogController : ControllerBase
     [RequestSizeLimit(ImageFormat.MaxBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = ImageFormat.MaxBytes)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> AddProductImage(
         Guid id, IFormFile file, [FromForm] Guid? variantId, [FromForm] string? altText, CancellationToken ct)
@@ -196,36 +197,11 @@ public sealed class CatalogController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Back-compat: uploads a single general image (becomes primary if first). Superseded by
-    /// <c>POST .../images</c>; kept so the existing admin upload keeps working during the gallery
-    /// rollout.
-    /// </summary>
-    [HttpPost("products/{id:guid}/image")]
-    [Authorize(Roles = Roles.Administrator)]
-    [RequestSizeLimit(ImageFormat.MaxBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = ImageFormat.MaxBytes)]
-    [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> UploadProductImage(Guid id, IFormFile file, CancellationToken ct)
-    {
-        (IActionResult? error, Stream? stream, string contentType) = await ValidateImageUploadAsync(file, ct);
-        if (error is not null)
-        {
-            return error;
-        }
-
-        await using (stream!)
-        {
-            ProductDetailDto product = await _catalog.AddProductImageAsync(id, stream!, contentType, variantId: null, altText: null, ct);
-            return Ok(ApiResponse<ProductDetailDto>.Ok(product));
-        }
-    }
-
     /// <summary>Reorders a product's gallery (body = the full set of image ids in display order).</summary>
     [HttpPut("products/{id:guid}/images/order")]
     [Authorize(Roles = Roles.Administrator)]
     [ProducesResponseType(typeof(ApiResponse<ProductDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ReorderProductImages(Guid id, [FromBody] ReorderProductImagesRequest request, CancellationToken ct)
     {

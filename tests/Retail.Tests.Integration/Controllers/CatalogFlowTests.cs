@@ -268,6 +268,45 @@ public class CatalogFlowTests
     }
 
     [Fact]
+    public async Task Gallery_Reorder_WithIncompleteSet_Returns409()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string firstId = await AddImageAsync(admin, productId, csrf, "a.png");
+        await AddImageAsync(admin, productId, csrf, "b.png");
+
+        // The reorder list omits the second image → not the product's full current set → 409,
+        // keeping SortOrder a dense, unambiguous 0..n-1.
+        HttpResponseMessage resp = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/order", new { imageIds = new[] { firstId } }, csrf);
+
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Gallery_SetPrimary_OnAlreadyPrimary_IsNoOp_StillExactlyOnePrimary()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string firstId = await AddImageAsync(admin, productId, csrf, "a.png"); // first upload becomes primary
+        await AddImageAsync(admin, productId, csrf, "b.png");
+
+        // Re-promote the image that is ALREADY primary → no-op (the promotion branch is guarded by
+        // !image.IsPrimary), so it stays primary and the one-primary invariant still holds.
+        HttpResponseMessage resp = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/images/{firstId}", new { isPrimary = true }, csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        JsonElement data = await DataAsync(resp);
+        JsonElement target = Images(data).First(i => i.GetProperty("id").GetString() == firstId);
+        Assert.True(target.GetProperty("isPrimary").GetBoolean());
+        Assert.Equal(1, Images(data).Count(i => i.GetProperty("isPrimary").GetBoolean()));
+        Assert.Equal(target.GetProperty("blobKey").GetString(), data.GetProperty("primaryImageBlobKey").GetString());
+    }
+
+    [Fact]
     public async Task Gallery_UploadWithUnknownVariant_Returns404()
     {
         (HttpClient admin, string csrf) = await AdminClientAsync();

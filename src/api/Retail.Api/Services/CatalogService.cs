@@ -234,7 +234,28 @@ public sealed class CatalogService : ICatalogService
             product.PrimaryImageBlobKey = blobKey;
         }
 
-        await SavePrimaryChangeAsync(ct);
+        try
+        {
+            await SavePrimaryChangeAsync(ct);
+        }
+        catch
+        {
+            // The blob was uploaded but the row never persisted (e.g. the primary-index race → 409,
+            // or any save failure) — best-effort delete the just-uploaded blob so it isn't orphaned,
+            // then re-throw the original failure (mirrors DeleteProductImageAsync's cleanup).
+            try
+            {
+                await _blob.DeleteAsync(_storage.ProductImagesContainer, blobKey, ct);
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(
+                    cleanupEx, "Failed to clean up orphan image blob {BlobKey} for product {ProductId} after a failed insert", blobKey, product.Id);
+            }
+
+            throw;
+        }
+
         _logger.LogInformation("Added image {ImageId} to product {ProductId} (primary={Primary})", image.Id, product.Id, isPrimary);
         return product.ToDetailDto();
     }
@@ -304,6 +325,7 @@ public sealed class CatalogService : ICatalogService
         }
 
         await _products.SaveChangesAsync(ct);
+        _logger.LogInformation("Reordered {ImageCount} image(s) for product {ProductId}", imageIds.Count, product.Id);
         return product.ToDetailDto();
     }
 
@@ -344,6 +366,8 @@ public sealed class CatalogService : ICatalogService
             await _products.SaveChangesAsync(ct);
         }
 
+        _logger.LogInformation(
+            "Updated image {ImageId} on product {ProductId} (primary={Primary})", image.Id, product.Id, image.IsPrimary);
         return product.ToDetailDto();
     }
 
