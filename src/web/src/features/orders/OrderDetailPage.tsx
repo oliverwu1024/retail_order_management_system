@@ -6,11 +6,11 @@ import { toast } from '@/hooks/use-toast'
 import { formatCents } from '@/lib/format'
 import { OrderStatusBadge } from './components/OrderStatusBadge'
 import { useCancelOrder } from './hooks/useOrderMutations'
-import { useOrderQuery } from './hooks/useOrdersQuery'
+import { ApiError, useOrderQuery } from './hooks/useOrdersQuery'
 
 export function OrderDetailPage() {
   const { id } = useParams()
-  const { data: order, isLoading, isError } = useOrderQuery(id)
+  const { data: order, isLoading, isError, error } = useOrderQuery(id)
   const cancelOrder = useCancelOrder()
 
   if (isLoading) {
@@ -18,9 +18,19 @@ export function OrderDetailPage() {
   }
 
   if (isError || !order) {
+    // Distinguish not-found vs. unauthorized vs. a network/server failure (was all "Order not found").
+    const status = error instanceof ApiError ? error.status : undefined
+    const message =
+      status === 401
+        ? 'Please sign in to view this order.'
+        : status === 404
+          ? 'Order not found.'
+          : status === undefined
+            ? 'Could not reach the server. Check your connection and try again.'
+            : 'Something went wrong loading this order.'
     return (
       <p className="text-sm text-destructive">
-        Order not found.{' '}
+        {message}{' '}
         <Link to="/orders" className="underline">
           Back to orders
         </Link>

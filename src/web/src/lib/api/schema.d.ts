@@ -853,57 +853,13 @@ export interface paths {
                         "application/json": components["schemas"]["ProductDetailDtoApiResponse"];
                     };
                 };
-                /** @description Unprocessable Content */
-                422: {
+                /** @description Not Found */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": components["schemas"]["ApiResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/catalog/products/{id}/image": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "multipart/form-data": {
-                        /** Format: binary */
-                        file?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ProductDetailDtoApiResponse"];
                     };
                 };
                 /** @description Unprocessable Content */
@@ -955,6 +911,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ProductDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
                 /** @description Conflict */
@@ -1012,6 +977,15 @@ export interface paths {
                 };
                 /** @description Not Found */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1521,8 +1495,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    page?: number;
-                    pageSize?: number;
+                    Page?: number;
+                    PageSize?: number;
                 };
                 header?: never;
                 path?: never;
@@ -1537,6 +1511,24 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["OrderSummaryDtoPagedResultApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
             };
@@ -1574,6 +1566,24 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["OrderDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
                 /** @description Not Found */
@@ -1668,6 +1678,24 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["OrderDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
                     };
                 };
                 /** @description Not Found */

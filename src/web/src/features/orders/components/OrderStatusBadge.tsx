@@ -8,6 +8,7 @@ const VARIANT: Record<string, BadgeVariant> = {
   Paid: 'success',
   Fulfilled: 'default',
   Cancelled: 'secondary',
+  Refunding: 'warning',
   Refunded: 'secondary',
 }
 

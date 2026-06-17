@@ -41,6 +41,16 @@ export function ImageGalleryManager({ productId, images, variants }: ImageGaller
   const ordered = [...images].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   const orderedIds = ordered.map((i) => i.id ?? '')
 
+  // The mutations are owned HERE, not per-row, so a single in-flight write disables the WHOLE
+  // gallery — otherwise a sibling row (or the upload box) could fire a conflicting write while
+  // another mutation is mid-flight, churning the cache and racing the one-primary invariant.
+  const addImage = useAddProductImage()
+  const updateImage = useUpdateProductImage()
+  const reorderImages = useReorderProductImages()
+  const deleteImage = useDeleteProductImage()
+  const galleryBusy =
+    addImage.isPending || updateImage.isPending || reorderImages.isPending || deleteImage.isPending
+
   return (
     <section className="space-y-4">
       <div>
@@ -51,7 +61,12 @@ export function ImageGalleryManager({ productId, images, variants }: ImageGaller
         </p>
       </div>
 
-      <UploadRow productId={productId} variants={variants} />
+      <UploadRow
+        productId={productId}
+        variants={variants}
+        addImage={addImage}
+        galleryBusy={galleryBusy}
+      />
 
       {ordered.length === 0 ? (
         <p className="text-sm text-muted-foreground">No images yet — upload one above.</p>
@@ -65,6 +80,10 @@ export function ImageGalleryManager({ productId, images, variants }: ImageGaller
               variants={variants}
               index={index}
               orderedIds={orderedIds}
+              updateImage={updateImage}
+              reorderImages={reorderImages}
+              deleteImage={deleteImage}
+              galleryBusy={galleryBusy}
             />
           ))}
         </ul>
@@ -73,8 +92,17 @@ export function ImageGalleryManager({ productId, images, variants }: ImageGaller
   )
 }
 
-function UploadRow({ productId, variants }: { productId: string; variants: ProductVariant[] }) {
-  const addImage = useAddProductImage()
+function UploadRow({
+  productId,
+  variants,
+  addImage,
+  galleryBusy,
+}: {
+  productId: string
+  variants: ProductVariant[]
+  addImage: ReturnType<typeof useAddProductImage>
+  galleryBusy: boolean
+}) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [variantId, setVariantId] = useState<string>(GENERAL)
@@ -145,7 +173,7 @@ function UploadRow({ productId, variants }: { productId: string; variants: Produ
             value={variantId}
             variants={variants}
             onChange={setVariantId}
-            disabled={addImage.isPending}
+            disabled={galleryBusy}
           />
         </label>
         <label className="space-y-1 text-sm">
@@ -156,9 +184,10 @@ function UploadRow({ productId, variants }: { productId: string; variants: Produ
             onChange={(e) => setAltText(e.target.value)}
             placeholder="e.g. front view"
             className="w-56"
+            disabled={galleryBusy}
           />
         </label>
-        <Button type="button" size="sm" disabled={!file || addImage.isPending} onClick={onUpload}>
+        <Button type="button" size="sm" disabled={!file || galleryBusy} onClick={onUpload}>
           {addImage.isPending ? 'Uploading…' : 'Add image'}
         </Button>
       </div>
@@ -173,18 +202,24 @@ function GalleryRow({
   variants,
   index,
   orderedIds,
+  updateImage,
+  reorderImages,
+  deleteImage,
+  galleryBusy,
 }: {
   productId: string
   image: ProductImageDto
   variants: ProductVariant[]
   index: number
   orderedIds: string[]
+  updateImage: ReturnType<typeof useUpdateProductImage>
+  reorderImages: ReturnType<typeof useReorderProductImages>
+  deleteImage: ReturnType<typeof useDeleteProductImage>
+  galleryBusy: boolean
 }) {
-  const updateImage = useUpdateProductImage()
-  const reorderImages = useReorderProductImages()
-  const deleteImage = useDeleteProductImage()
   const imageId = image.id ?? ''
-  const busy = updateImage.isPending || reorderImages.isPending || deleteImage.isPending
+  // Gallery-wide: any in-flight mutation disables every row's controls, not just the acting one.
+  const busy = galleryBusy
 
   // Controlled local state for the editable fields so a save uses the LIVE values rather than the
   // (possibly stale) image prop — this prevents lost updates when promoting to primary or changing

@@ -83,14 +83,18 @@ export function useDeleteProduct() {
   })
 }
 
-// After any gallery change, refresh both the public/admin product caches AND this product's
-// detail (the edit page reads images[] from the detail query).
+// After any gallery change, refresh the public/admin grids, this product's admin detail (the edit
+// page reads images[] from it) AND the public storefront detail (keyed by slug) so a buyer viewing
+// the product sees the new images without a manual refresh.
 function useInvalidateGallery() {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateProducts()
-  return (productId: string) => {
+  return (productId: string, slug?: string | null) => {
     invalidate()
     void queryClient.invalidateQueries({ queryKey: adminProductKeys.detail(productId) })
+    if (slug) {
+      void queryClient.invalidateQueries({ queryKey: ['product', slug] })
+    }
   }
 }
 
@@ -132,7 +136,7 @@ export function useAddProductImage() {
       }
       return data.data
     },
-    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+    onSuccess: (data, vars) => invalidateGallery(vars.id, data.slug),
   })
 }
 
@@ -157,7 +161,7 @@ export function useUpdateProductImage() {
       }
       return data.data
     },
-    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+    onSuccess: (data, vars) => invalidateGallery(vars.id, data.slug),
   })
 }
 
@@ -175,7 +179,7 @@ export function useReorderProductImages() {
       }
       return data.data
     },
-    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+    onSuccess: (data, vars) => invalidateGallery(vars.id, data.slug),
   })
 }
 
@@ -195,6 +199,6 @@ export function useDeleteProductImage() {
       }
       return data.data
     },
-    onSuccess: (_data, vars) => invalidateGallery(vars.id),
+    onSuccess: (data, vars) => invalidateGallery(vars.id, data.slug),
   })
 }
