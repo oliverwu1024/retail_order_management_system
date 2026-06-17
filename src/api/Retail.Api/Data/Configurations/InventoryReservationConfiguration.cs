@@ -10,7 +10,12 @@ public sealed class InventoryReservationConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<InventoryReservation> builder)
     {
-        builder.ToTable("InventoryReservation");
+        // Exactly one owner: cart-bound (pre-payment) XOR order-bound (post-commit). The service
+        // upholds this (insert sets CartId; commit re-homes to OrderId + nulls CartId); the CHECK
+        // is the DB backstop, mirroring CK_Order_Identity.
+        builder.ToTable("InventoryReservation", table => table.HasCheckConstraint(
+            "CK_InventoryReservation_Owner",
+            "([CartId] IS NOT NULL AND [OrderId] IS NULL) OR ([CartId] IS NULL AND [OrderId] IS NOT NULL)"));
         builder.HasKey(r => r.Id);
 
         builder.Property(r => r.Status).HasColumnType("tinyint").HasDefaultValue(ReservationStatus.Active);

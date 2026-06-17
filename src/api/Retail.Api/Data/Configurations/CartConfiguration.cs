@@ -26,11 +26,19 @@ public sealed class CartConfiguration : IEntityTypeConfiguration<Cart>
             .HasForeignKey(c => c.CustomerProfileId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Member lookup ("the open cart for this profile").
-        builder.HasIndex(c => new { c.CustomerProfileId, c.Status }, "IX_Cart_CustomerProfileId_Status");
-        // Guest lookup by cookie key — filtered to the rows that actually have a key.
-        builder.HasIndex(c => new { c.AnonymousKey, c.Status }, "IX_Cart_AnonymousKey_Status")
-            .HasFilter("[AnonymousKey] IS NOT NULL");
+        // At most ONE open cart per owner — promotes the app invariant (CartService fetch-or-create)
+        // to a DB guarantee, so a racing double "first add" can't leak a second open cart. The SQL
+        // filter can't reference the enum name, so Open is spelled as its tinyint value 1.
+        //
+        // Member: one Open cart per profile (guest carts have a null profile id → filtered out).
+        // This filtered-unique index also serves the "open cart for this profile" lookup.
+        builder.HasIndex(c => c.CustomerProfileId, "UX_Cart_OpenPerProfile")
+            .IsUnique()
+            .HasFilter("[Status] = 1 AND [CustomerProfileId] IS NOT NULL");
+        // Guest: one Open cart per cookie key (member carts have a null key → filtered out).
+        builder.HasIndex(c => c.AnonymousKey, "UX_Cart_OpenPerAnonymousKey")
+            .IsUnique()
+            .HasFilter("[Status] = 1 AND [AnonymousKey] IS NOT NULL");
         // Sweeper scan ("open carts past their expiry").
         builder.HasIndex(c => new { c.ExpiresAt, c.Status }, "IX_Cart_ExpiresAt_Status");
     }
