@@ -113,3 +113,23 @@ public enum PaymentStatus : byte
     /// <summary>This payment row represents a refund (negative amount).</summary>
     Refunded = 4,
 }
+
+/// <summary>
+/// Lifecycle of a <c>Shipment</c> (Phase 3). A shipment is created when staff
+/// "Mark Shipped" (carrier + tracking) — at which point the parent <c>Order</c>
+/// flips to <see cref="OrderStatus.Fulfilled"/> — and advances to
+/// <see cref="Delivered"/> on "Mark Delivered". The order-level status stays
+/// <c>Fulfilled</c>; this finer Pending → Shipped → Delivered progression lives on
+/// the Shipment so we never renumber <see cref="OrderStatus"/> (DATABASE_DESIGN §3.14).
+/// </summary>
+public enum ShipmentStatus : byte
+{
+    /// <summary>Shipment row exists but nothing has been dispatched yet.</summary>
+    Pending = 1,
+
+    /// <summary>Dispatched with a carrier — <c>ShippedAt</c> stamped, order is Fulfilled.</summary>
+    Shipped = 2,
+
+    /// <summary>Confirmed delivered — <c>DeliveredAt</c> stamped.</summary>
+    Delivered = 3,
+}

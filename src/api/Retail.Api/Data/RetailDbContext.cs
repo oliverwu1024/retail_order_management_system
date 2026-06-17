@@ -110,6 +110,12 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Per-order price breakdown (1:1 with <see cref="Order"/>).</summary>
     public DbSet<OrderPriceBreakdown> OrderPriceBreakdowns => Set<OrderPriceBreakdown>();
 
+    /// <summary>Fulfilment shipments (Phase 3).</summary>
+    public DbSet<Shipment> Shipments => Set<Shipment>();
+
+    /// <summary>Immutable audit trail of admin mutations (Phase 3).</summary>
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.

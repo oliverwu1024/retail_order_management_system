@@ -96,6 +96,11 @@ try
     // (the ?? throw) is intentional — silently running on a default connection
     // string is a security/data-corruption footgun.
     builder.Services.AddScoped<AuditingInterceptor>();
+    // AuditTrailInterceptor (Phase 3) appends immutable AuditLog before/after rows for the
+    // monitored entities; IAuditWriter lets services append named business-action rows. Both
+    // are scoped — they share the request DbContext / current-user accessor.
+    builder.Services.AddScoped<AuditTrailInterceptor>();
+    builder.Services.AddScoped<IAuditWriter, AuditWriter>();
     builder.Services.AddDbContext<RetailDbContext>((sp, options) =>
     {
         var connectionString = builder.Configuration.GetConnectionString("Default")
@@ -111,10 +116,12 @@ try
             sql.MigrationsAssembly(typeof(RetailDbContext).Assembly.FullName);
         });
 
-        // AddInterceptors hooks the AuditingInterceptor into the EF Core
-        // SaveChanges pipeline. Adding more interceptors here (outbox,
-        // optimistic concurrency, soft-delete) is a one-line change.
-        options.AddInterceptors(sp.GetRequiredService<AuditingInterceptor>());
+        // AddInterceptors hooks both audit interceptors into the EF Core SaveChanges pipeline.
+        // Order matters: AuditingInterceptor stamps CreatedBy/UpdatedAt FIRST so the trail's
+        // before/after snapshot reflects the final stamped values.
+        options.AddInterceptors(
+            sp.GetRequiredService<AuditingInterceptor>(),
+            sp.GetRequiredService<AuditTrailInterceptor>());
     });
 
     // ── Strongly-typed auth options ─────────────────────────────────────────
@@ -236,7 +243,33 @@ try
             };
         });
 
-    builder.Services.AddAuthorization();
+    // ── Authorization policies — the Phase 3 RBAC matrix (PHASE_3_SCOPE.md §3.1) ─
+    // Each capability is a NAMED policy (RequireRole over the canonical Roles.* names) defined
+    // ONCE here, so controllers reference a single key — e.g. [Authorize(Policy =
+    // Roles.Policies.OrdersRefund)] — and a rule change is one edit instead of a find-replace of
+    // role strings across controllers. Role names stay the source of truth in Roles.cs; the JWT
+    // already emits ClaimTypes.Role, so this needs no token change. Storefront Customer
+    // attributes stay role-based — only the admin matrix is policy-based.
+    string[] staffPlus = { Roles.Staff, Roles.StoreManager, Roles.Administrator };
+    string[] managerPlus = { Roles.StoreManager, Roles.Administrator };
+    string[] adminOnly = { Roles.Administrator };
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy(Roles.Policies.OrdersView, p => p.RequireRole(staffPlus));
+        options.AddPolicy(Roles.Policies.OrdersFulfill, p => p.RequireRole(staffPlus));
+        options.AddPolicy(Roles.Policies.InventoryAdjust, p => p.RequireRole(staffPlus));
+        options.AddPolicy(Roles.Policies.AuditView, p => p.RequireRole(staffPlus));
+        options.AddPolicy(Roles.Policies.ReportsView, p => p.RequireRole(staffPlus));
+
+        options.AddPolicy(Roles.Policies.OrdersRefund, p => p.RequireRole(managerPlus));
+        options.AddPolicy(Roles.Policies.UsersManageStaff, p => p.RequireRole(managerPlus));
+        options.AddPolicy(Roles.Policies.AuditExport, p => p.RequireRole(managerPlus));
+        options.AddPolicy(Roles.Policies.ReportsExport, p => p.RequireRole(managerPlus));
+
+        options.AddPolicy(Roles.Policies.UsersManageManagers, p => p.RequireRole(adminOnly));
+        options.AddPolicy(Roles.Policies.CatalogManage, p => p.RequireRole(adminOnly));
+    });
 
     // ── Auth services (ADR-0007) ────────────────────────────────────────────
     // JwtService + CsrfTokenService are immutable after construction → singletons.

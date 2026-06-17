@@ -3,6 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Retail.Api.Data;
+using Retail.Api.Domain.Entities;
 
 namespace Retail.Tests.Integration.Controllers;
 
@@ -493,6 +497,26 @@ public class CatalogFlowTests
         HttpResponseMessage add = await PostJsonAsync(
             guest, "/api/v1/cart/items", new { productVariantId = variantId, quantity = 1 }, guestCsrf);
         Assert.Equal(HttpStatusCode.OK, add.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreatingAProduct_WritesAnInsertAuditRow()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+
+        // The AuditTrailInterceptor should have appended an immutable "Insert" row for the Product.
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        AuditLog? row = await db.AuditLogs.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.EntityType == "Product" && a.EntityId == productId);
+
+        Assert.NotNull(row);
+        Assert.Equal("Insert", row!.Action);
+        Assert.Null(row.BeforeJson); // an insert has no "before"
+        Assert.NotNull(row.AfterJson); // ...but it captures the new values
+        Assert.NotEqual("system", row.Actor); // an authenticated admin created it
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────

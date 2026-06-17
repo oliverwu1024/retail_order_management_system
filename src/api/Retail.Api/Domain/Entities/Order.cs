@@ -87,6 +87,9 @@ public class Order : IAuditableEntity
     /// <summary>Payment events against this order (a charge, later possibly a refund).</summary>
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
+    /// <summary>The 1:0..1 fulfilment shipment — null until staff "Mark Shipped" (Phase 3).</summary>
+    public Shipment? Shipment { get; set; }
+
     // ── IAuditableEntity (stamped by AuditingInterceptor) ────────────────────
     /// <inheritdoc />
     public DateTimeOffset CreatedAt { get; set; }
