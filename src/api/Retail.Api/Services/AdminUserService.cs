@@ -34,17 +34,25 @@ public sealed class AdminUserService : IAdminUserService
         int safePage = page < 1 ? 1 : page;
         int safeSize = Math.Clamp(pageSize, 1, 100);
 
-        // A role filter goes through Identity's role lookup (no IQueryable for it); otherwise page
-        // the user set directly. Materialise, then page in memory — fine at admin-account scale.
-        IReadOnlyList<ApplicationUser> all = string.IsNullOrWhiteSpace(role)
-            ? await _userManager.Users.OrderBy(u => u.Email).ToListAsync(ct)
-            : (await _userManager.GetUsersInRoleAsync(role)).OrderBy(u => u.Email).ToList();
-
-        int total = all.Count;
-        IReadOnlyList<ApplicationUser> pageItems = all
-            .Skip((safePage - 1) * safeSize)
-            .Take(safeSize)
-            .ToList();
+        int total;
+        IReadOnlyList<ApplicationUser> pageItems;
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            // No role filter → page in SQL (COUNT + OFFSET/FETCH) so we never materialise the whole
+            // user table just to return one page.
+            IQueryable<ApplicationUser> ordered = _userManager.Users.OrderBy(u => u.Email);
+            total = await ordered.CountAsync(ct);
+            pageItems = await ordered.Skip((safePage - 1) * safeSize).Take(safeSize).ToListAsync(ct);
+        }
+        else
+        {
+            // Identity's role lookup has no IQueryable/paged variant, so it returns everyone in the
+            // role; page that (smaller, role-bounded) set in memory.
+            IReadOnlyList<ApplicationUser> inRole = (await _userManager.GetUsersInRoleAsync(role))
+                .OrderBy(u => u.Email).ToList();
+            total = inRole.Count;
+            pageItems = inRole.Skip((safePage - 1) * safeSize).Take(safeSize).ToList();
+        }
 
         // GetRolesAsync per user is an N+1, acceptable for a handful of back-office accounts; a join
         // over AspNetUserRoles is the optimisation if the user table ever grows large.
