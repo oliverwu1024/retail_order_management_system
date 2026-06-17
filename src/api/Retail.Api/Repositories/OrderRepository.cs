@@ -62,6 +62,56 @@ public sealed class OrderRepository : IOrderRepository
                 o => o.CustomerProfileId == null && o.Payments.Any(p => p.StripeSessionId == stripeSessionId), ct);
 
     /// <inheritdoc />
+    public async Task<(IReadOnlyList<Order> Items, int Total)> GetPagedForAdminAsync(
+        OrderStatus? status, DateTimeOffset? from, DateTimeOffset? to, string? customerEmail,
+        int page, int pageSize, CancellationToken ct)
+    {
+        IQueryable<Order> query = _db.Orders.AsNoTracking();
+
+        if (status is OrderStatus s)
+        {
+            query = query.Where(o => o.Status == s);
+        }
+        if (from is DateTimeOffset f)
+        {
+            query = query.Where(o => o.PlacedAt >= f);
+        }
+        if (to is DateTimeOffset t)
+        {
+            query = query.Where(o => o.PlacedAt < t);
+        }
+        if (!string.IsNullOrWhiteSpace(customerEmail))
+        {
+            string email = customerEmail.Trim();
+            // Match a guest order's email OR a member order's Identity-user email (via the profile).
+            query = query.Where(o =>
+                (o.GuestEmail != null && o.GuestEmail.Contains(email)) ||
+                (o.CustomerProfile != null && o.CustomerProfile.User != null
+                    && o.CustomerProfile.User.Email != null && o.CustomerProfile.User.Email.Contains(email)));
+        }
+
+        int total = await query.CountAsync(ct);
+        List<Order> items = await query
+            .Include(o => o.Lines)
+            .Include(o => o.Shipment)
+            .Include(o => o.CustomerProfile).ThenInclude(p => p!.User)
+            .OrderByDescending(o => o.PlacedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+        return (items, total);
+    }
+
+    /// <inheritdoc />
+    public async Task<Order?> GetDetailForAdminAsync(Guid orderId, CancellationToken ct) =>
+        await _db.Orders.AsNoTracking()
+            .Include(o => o.Lines)
+            .Include(o => o.Payments)
+            .Include(o => o.Shipment)
+            .Include(o => o.CustomerProfile).ThenInclude(p => p!.User)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+    /// <inheritdoc />
     public async Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct) =>
         await _db.Payments.AsNoTracking()
             .Where(p => p.OrderId == orderId && p.AmountCents > 0 && p.StripePaymentIntentId != null)

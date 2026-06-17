@@ -29,6 +29,14 @@ public interface IOrderRepository
     /// <summary>An order (with lines) by Stripe session id — the guest bearer lookup. Read-only. Null if none.</summary>
     Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct);
 
+    /// <summary>Admin workbench list (NOT owner-scoped): all orders, optional status/date/email filters, paged.</summary>
+    Task<(IReadOnlyList<Order> Items, int Total)> GetPagedForAdminAsync(
+        Common.Enums.OrderStatus? status, DateTimeOffset? from, DateTimeOffset? to, string? customerEmail,
+        int page, int pageSize, CancellationToken ct);
+
+    /// <summary>Admin order detail (NOT owner-scoped): lines + payments + shipment + the buyer's profile/user.</summary>
+    Task<Order?> GetDetailForAdminAsync(Guid orderId, CancellationToken ct);
+
     /// <summary>The PaymentIntent id of an order's charge (positive payment), for issuing a refund. Null if none.</summary>
     Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct);
 
