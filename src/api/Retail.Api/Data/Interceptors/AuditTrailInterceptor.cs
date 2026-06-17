@@ -103,9 +103,12 @@ public sealed class AuditTrailInterceptor : SaveChangesInterceptor
         string actor = _currentUser.UserId ?? "system";
 
         // Snapshot the monitored changes into a list FIRST — adding AuditLog rows below mutates
-        // the ChangeTracker, so we must not be iterating it at the same time.
+        // the ChangeTracker, so we must not be iterating it at the same time. The explicit
+        // AuditLog exclusion is defensive recursion-safety: the trail is an append-only ledger that
+        // must never trail itself, even if someone later adds AuditLog to the Monitored set.
         List<EntityEntry> tracked = context.ChangeTracker.Entries()
             .Where(e => Monitored.Contains(e.Metadata.ClrType)
+                        && e.Metadata.ClrType != typeof(AuditLog)
                         && e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
             .ToList();
 

@@ -167,6 +167,16 @@ public sealed class AdminOrderService : IAdminOrderService
                 throw new ConflictException($"Order #{order.OrderNumber} can't be refunded in its current state.");
             }
             justClaimed = true;
+
+            // The claim is a set-based ExecuteUpdate (bypasses the interceptor), so record the
+            // Paid → Refunding flip explicitly. Staged here; flushed by the reversal's SaveChanges
+            // on success, or by the rollback's SaveChanges on Stripe failure (below).
+            _audit.Record(
+                "RefundClaimed",
+                nameof(Order),
+                orderId.ToString(),
+                before: new { Status = nameof(OrderStatus.Paid) },
+                after: new { Status = nameof(OrderStatus.Refunding) });
         }
 
         try
@@ -181,26 +191,25 @@ public sealed class AdminOrderService : IAdminOrderService
             if (justClaimed)
             {
                 await _orders.ReleaseRefundClaimToAsync(orderId, OrderStatus.Paid, _timeProvider.GetUtcNow(), actor, ct);
+                _audit.Record(
+                    "RefundClaimReleased",
+                    nameof(Order),
+                    orderId.ToString(),
+                    before: new { Status = nameof(OrderStatus.Refunding) },
+                    after: new { Status = nameof(OrderStatus.Paid) });
+                // Persist the claim + release evidence — the rollback leaves no other write to flush it.
+                await _orders.SaveChangesAsync(ct);
             }
             throw;
         }
 
-        // Stage the named "Refund" business-event row BEFORE the reversal so it commits in the SAME
-        // transaction as Refunded/restock/negative-Payment (the reversal's own SaveChanges flushes
-        // it). The reversal also auto-audits the Order + Payment changes via the interceptor; the
-        // restock is ExecuteUpdate-based (bypasses it), so this named row records the event.
-        _audit.Record(
-            "Refund",
-            nameof(Order),
-            orderId.ToString(),
-            before: new { Status = nameof(OrderStatus.Paid) },
-            after: new { Status = nameof(OrderStatus.Refunded) });
-
         // Money's back — apply the idempotent local reversal (Refunding → Refunded + restock +
-        // negative Payment). Idempotent, so a duplicate (e.g. the charge.refunded webhook) is a no-op.
+        // negative Payment), which also records the named "Refund" + per-variant "Restocked" rows at
+        // the actual transition. Idempotent, so a duplicate (e.g. the charge.refunded webhook) is a no-op.
         await _orderRefund.RefundByPaymentIntentAsync(paymentIntentId, ct);
 
-        // Flush the named row if the reversal short-circuited as a no-op (already Refunded).
+        // Flush any staged audit row (e.g. RefundClaimed) the reversal's own SaveChanges didn't —
+        // happens when the reversal short-circuited as a no-op (already Refunded by a concurrent webhook).
         await _orders.SaveChangesAsync(ct);
 
         return await GetAsync(orderId, ct);

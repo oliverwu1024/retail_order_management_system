@@ -160,6 +160,25 @@ public class AdminOrderFlowTests
         Assert.Contains(data.GetProperty("payments").EnumerateArray(),
             payment => payment.GetProperty("amountCents").GetInt32() < 0); // a negative refund row
         Assert.True(await HasAuditRowAsync("Refund", "Order", orderId.ToString()));
+        // The set-based claim + restock are audited too (review L5/L4): a "RefundClaimed" Order row
+        // (Paid→Refunding) and a "Restocked" InventoryItem row tied to this order.
+        Assert.True(await HasAuditRowAsync("RefundClaimed", "Order", orderId.ToString()));
+        Assert.True(await HasAuditRowContainingAsync("Restocked", "InventoryItem", orderId.ToString()));
+    }
+
+    [Fact]
+    public async Task AuditTrail_NeverTrailsItself()
+    {
+        // After a refund (which writes Refund + RefundClaimed + Restocked + interceptor rows), the
+        // append-only ledger must contain ZERO rows about AuditLog itself (review L3, recursion guard).
+        string email = $"g-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, email, onHand: 4, withCharge: true);
+        (HttpClient manager, string csrf) = await StoreManagerClientAsync();
+        (await PostAsync(manager, $"/api/v1/admin/orders/{orderId}/refund", csrf)).EnsureSuccessStatusCode();
+
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        Assert.False(await db.AuditLogs.AsNoTracking().AnyAsync(a => a.EntityType == "AuditLog"));
     }
 
     [Fact]
@@ -282,6 +301,16 @@ public class AdminOrderFlowTests
         RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
         return await db.AuditLogs.AsNoTracking()
             .AnyAsync(a => a.Action == action && a.EntityType == entityType && a.EntityId == entityId);
+    }
+
+    // For rows keyed by a different id than the test holds (e.g. a restock keyed by InventoryItem id) —
+    // matches a row whose before/after JSON mentions the given needle (here, the order id).
+    private async Task<bool> HasAuditRowContainingAsync(string action, string entityType, string needle)
+    {
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        return await db.AuditLogs.AsNoTracking().AnyAsync(a =>
+            a.Action == action && a.EntityType == entityType && a.AfterJson != null && a.AfterJson.Contains(needle));
     }
 
     private async Task<int> ReadOnHandAsync(Guid variantId)
