@@ -375,7 +375,7 @@ public class CatalogFlowTests
     }
 
     [Fact]
-    public async Task DeleteVariant_WithVariantImage_Succeeds_AndReHomesImageToGeneral()
+    public async Task DeleteVariant_WithVariantImage_DeactivatesVariant_AndKeepsImageAssociation()
     {
         (HttpClient admin, string csrf) = await AdminClientAsync();
         string suffix = Guid.NewGuid().ToString("N")[..8];
@@ -384,18 +384,22 @@ public class CatalogFlowTests
         (await UploadImageAsync(admin, productId, MinimalPng(), "image/png", "v.png", csrf, variantId: Guid.Parse(variantId)))
             .EnsureSuccessStatusCode();
 
-        // Before the fix this 500'd (variant→image FK is NoAction and the images weren't detached).
+        // "Delete" now DEACTIVATES (no hard delete), so the variant — and its variant-specific
+        // image — are preserved rather than the image being re-homed to general.
         HttpResponseMessage del = await DeleteAsync(admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}", csrf);
         Assert.Equal(HttpStatusCode.OK, del.StatusCode);
 
-        // The image survives, re-homed to general (productVariantId null).
         JsonElement detail = await DataAsync(await admin.GetAsync($"/api/v1/catalog/admin/products/{productId}"));
+
+        // The variant survives, now inactive.
+        JsonElement variant = detail.GetProperty("variants").EnumerateArray()
+            .Single(v => v.GetProperty("id").GetString() == variantId);
+        Assert.False(variant.GetProperty("isActive").GetBoolean());
+
+        // Its image survives AND stays associated with the (still-existing) variant.
         List<JsonElement> images = Images(detail);
         Assert.Single(images);
-        // General image = productVariantId is null (the serializer omits null properties).
-        bool isGeneral = !images[0].TryGetProperty("productVariantId", out JsonElement pv)
-            || pv.ValueKind == JsonValueKind.Null;
-        Assert.True(isGeneral, "the re-homed image should have no variant association");
+        Assert.Equal(variantId, images[0].GetProperty("productVariantId").GetString());
     }
 
     [Fact]
@@ -424,6 +428,71 @@ public class CatalogFlowTests
             admin, productId, MinimalPng(), "image/png", "a.png", csrf, altText: new string('x', 201));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteVariant_WhenReferencedByCart_DeactivatesInsteadOfHardDeleting()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string variantId = await AddVariantAsync(admin, productId, csrf, suffix);
+
+        // Put the variant in a live guest cart so the CartItem→ProductVariant RESTRICT FK references
+        // it. A hard delete here would raise SQL FK 547 → 500; deactivation must succeed.
+        HttpClient guest = _factory.CreateClient();
+        string guestCsrf = ExtractCookie(await guest.GetAsync("/api/v1/auth/csrf"), "csrf");
+        HttpResponseMessage add = await PostJsonAsync(
+            guest, "/api/v1/cart/items", new { productVariantId = variantId, quantity = 1 }, guestCsrf);
+        Assert.Equal(HttpStatusCode.OK, add.StatusCode);
+
+        // "Delete" the referenced variant — succeeds by DEACTIVATING, not hard-deleting.
+        HttpResponseMessage del = await DeleteAsync(
+            admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}", csrf);
+        Assert.Equal(HttpStatusCode.OK, del.StatusCode);
+
+        // The variant row survives, now inactive — the cart line (history) is preserved.
+        JsonElement detail = await DataAsync(await admin.GetAsync($"/api/v1/catalog/admin/products/{productId}"));
+        JsonElement variant = detail.GetProperty("variants").EnumerateArray()
+            .Single(v => v.GetProperty("id").GetString() == variantId);
+        Assert.False(variant.GetProperty("isActive").GetBoolean());
+
+        // Idempotent: deactivating an already-inactive variant is still a clean 200.
+        HttpResponseMessage again = await DeleteAsync(
+            admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}", csrf);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+
+        // And a deactivated variant is no longer sellable: add-to-cart 404s.
+        HttpResponseMessage readd = await PostJsonAsync(
+            guest, "/api/v1/cart/items", new { productVariantId = variantId, quantity = 1 }, guestCsrf);
+        Assert.Equal(HttpStatusCode.NotFound, readd.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReactivateVariant_ViaUpdate_MakesItSellableAgain()
+    {
+        (HttpClient admin, string csrf) = await AdminClientAsync();
+        string suffix = Guid.NewGuid().ToString("N")[..8];
+        string productId = await CreateProductAsync(admin, csrf, suffix);
+        string variantId = await AddVariantAsync(admin, productId, csrf, suffix);
+
+        // Deactivate, then reactivate via the variant update endpoint (IsActive=true) — the
+        // path the admin UI's "Reactivate" button uses.
+        (await DeleteAsync(admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}", csrf))
+            .EnsureSuccessStatusCode();
+        HttpResponseMessage reactivate = await PutJsonAsync(
+            admin, $"/api/v1/catalog/products/{productId}/variants/{variantId}",
+            new { options = (Dictionary<string, string>?)null, priceCents = 1999, compareAtPriceCents = (int?)null, isActive = true },
+            csrf);
+        Assert.Equal(HttpStatusCode.OK, reactivate.StatusCode);
+        Assert.True((await DataAsync(reactivate)).GetProperty("isActive").GetBoolean());
+
+        // Sellable again: a guest can add it to a cart.
+        HttpClient guest = _factory.CreateClient();
+        string guestCsrf = ExtractCookie(await guest.GetAsync("/api/v1/auth/csrf"), "csrf");
+        HttpResponseMessage add = await PostJsonAsync(
+            guest, "/api/v1/cart/items", new { productVariantId = variantId, quantity = 1 }, guestCsrf);
+        Assert.Equal(HttpStatusCode.OK, add.StatusCode);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────

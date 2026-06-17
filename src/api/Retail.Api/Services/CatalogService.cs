@@ -447,22 +447,21 @@ public sealed class CatalogService : ICatalogService
     {
         ProductVariant variant = await GetVariantForWriteAsync(productId, variantId, ct);
 
-        // Hard delete (its 1:1 inventory cascades). Safe in Phase 1 — no orders reference
-        // variants yet; Phase 2 should switch to deactivation (IsActive=false) once they do.
-        Product product = variant.Product!;
-
-        // Re-home this variant's images to GENERAL first. The variant→image FK is NoAction, so the
-        // images must stop referencing the variant before it's hard-deleted, or SQL raises an FK
-        // violation (the image rows themselves are still valid product images).
-        foreach (ProductImage image in product.Images.Where(i => i.ProductVariantId == variantId))
+        // Deactivate, never hard-delete. Since Phase 2, a variant is referenced by OrderLine and
+        // CartItem (both RESTRICT FKs), so hard-deleting a variant that has ever been ordered — or
+        // is sitting in a live cart — would raise a SQL FK violation, and an order must keep
+        // pointing at the exact variant it was placed against (history is immutable). Flipping
+        // IsActive=false hides it from the storefront and from add-to-cart (GetSellableVariantAsync
+        // filters on IsActive) while preserving every reference. Reactivate via the variant update
+        // endpoint (UpdateVariantAsync with IsActive=true). Idempotent: deactivating an already
+        // inactive variant is a no-op success.
+        if (variant.IsActive)
         {
-            image.ProductVariantId = null;
+            variant.IsActive = false;
+            await _products.SaveChangesAsync(ct);
         }
 
-        product.Variants.Remove(variant);
-        await _products.SaveChangesAsync(ct);
-
-        _logger.LogInformation("Deleted variant {VariantId} from product {ProductId}", variantId, productId);
+        _logger.LogInformation("Deactivated variant {VariantId} on product {ProductId}", variantId, productId);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────

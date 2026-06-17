@@ -1,11 +1,16 @@
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import type { ProductVariant } from '@/lib/api/types'
 import { formatCents } from '@/lib/format'
-import { useAddVariant, useDeleteVariant } from '../hooks/useVariantMutations'
+import {
+  useAddVariant,
+  useDeactivateVariant,
+  useReactivateVariant,
+} from '../hooks/useVariantMutations'
 import {
   toCreateVariantBody,
   variantFormSchema,
@@ -37,14 +42,18 @@ function formatOptions(options: ProductVariant['options']): string {
 }
 
 /**
- * Variant management for the edit page: a table of existing variants (with
- * delete) plus an inline add form. Options are an arbitrary key/value map
- * (Size → M, Color → Red), so the add form uses useFieldArray to add/remove
- * option rows dynamically before they're folded into the request's options map.
+ * Variant management for the edit page: a table of existing variants (deactivate /
+ * reactivate) plus an inline add form. Variants are never hard-deleted — orders and
+ * carts reference them — so "removing" one deactivates it (hidden from sale, row kept)
+ * and it can be reactivated. Options are an arbitrary key/value map (Size → M, Color →
+ * Red), so the add form uses useFieldArray to add/remove option rows dynamically before
+ * they're folded into the request's options map.
  */
 export function VariantsSection({ productId, variants }: VariantsSectionProps) {
   const addVariant = useAddVariant()
-  const deleteVariant = useDeleteVariant()
+  const deactivateVariant = useDeactivateVariant()
+  const reactivateVariant = useReactivateVariant()
+  const mutating = deactivateVariant.isPending || reactivateVariant.isPending
 
   const {
     register,
@@ -77,12 +86,22 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
     )
   }
 
-  function onDelete(variantId: string) {
-    deleteVariant.mutate(
+  function onDeactivate(variantId: string) {
+    deactivateVariant.mutate(
       { productId, variantId },
       {
-        onSuccess: () => toast({ title: 'Variant deleted' }),
-        onError: () => toast({ variant: 'destructive', title: 'Couldn’t delete variant' }),
+        onSuccess: () => toast({ title: 'Variant deactivated' }),
+        onError: () => toast({ variant: 'destructive', title: 'Couldn’t deactivate variant' }),
+      },
+    )
+  }
+
+  function onReactivate(variant: ProductVariant) {
+    reactivateVariant.mutate(
+      { productId, variant },
+      {
+        onSuccess: () => toast({ title: 'Variant reactivated' }),
+        onError: () => toast({ variant: 'destructive', title: 'Couldn’t reactivate variant' }),
       },
     )
   }
@@ -101,30 +120,54 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
                 <th className="px-3 py-2 font-medium">Price</th>
                 <th className="px-3 py-2 font-medium">Stock</th>
                 <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Active</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody>
-              {variants.map((variant) => (
-                <tr key={variant.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
-                  <td className="px-3 py-2">{formatOptions(variant.options)}</td>
-                  <td className="px-3 py-2">{formatCents(variant.priceCents ?? 0)}</td>
-                  <td className="px-3 py-2">{variant.available ?? 0}</td>
-                  <td className="px-3 py-2">{variant.stockStatus ?? '—'}</td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={deleteVariant.isPending}
-                      onClick={() => variant.id && onDelete(variant.id)}
-                    >
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {variants.map((variant) => {
+                const inactive = variant.isActive === false
+                return (
+                  <tr
+                    key={variant.id}
+                    className={`border-b last:border-0 ${inactive ? 'opacity-60' : ''}`}
+                  >
+                    <td className="px-3 py-2 font-mono text-xs">{variant.sku}</td>
+                    <td className="px-3 py-2">{formatOptions(variant.options)}</td>
+                    <td className="px-3 py-2">{formatCents(variant.priceCents ?? 0)}</td>
+                    <td className="px-3 py-2">{variant.available ?? 0}</td>
+                    <td className="px-3 py-2">{variant.stockStatus ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <Badge variant={inactive ? 'secondary' : 'success'}>
+                        {inactive ? 'Inactive' : 'Active'}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {inactive ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={mutating}
+                          onClick={() => onReactivate(variant)}
+                        >
+                          Reactivate
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={mutating || !variant.id}
+                          onClick={() => variant.id && onDeactivate(variant.id)}
+                        >
+                          Deactivate
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

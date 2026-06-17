@@ -267,14 +267,18 @@ public sealed class CatalogController : ControllerBase
         return Ok(ApiResponse<ProductVariantDto>.Ok(variant));
     }
 
-    /// <summary>Deletes a variant from a product.</summary>
+    /// <summary>
+    /// Deactivates a variant (sets IsActive=false). It is NOT hard-deleted: orders and carts
+    /// reference variants, so the row is preserved to keep that history intact. Reactivate it via
+    /// the variant update endpoint (IsActive=true). Idempotent.
+    /// </summary>
     [HttpDelete("products/{id:guid}/variants/{variantId:guid}")]
     [Authorize(Roles = Roles.Administrator)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteVariant(Guid id, Guid variantId, CancellationToken ct)
     {
         await _catalog.DeleteVariantAsync(id, variantId, ct);
-        return Ok(ApiResponse.Ok("Variant deleted."));
+        return Ok(ApiResponse.Ok("Variant deactivated."));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────
