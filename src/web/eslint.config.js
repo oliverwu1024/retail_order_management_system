@@ -10,7 +10,17 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 // any stylistic rules from earlier configs that would conflict with Prettier
 // — i.e., let Prettier own formatting, let ESLint own correctness.
 export default defineConfig([
-  globalIgnores(['dist', 'src/lib/api/schema.d.ts']),
+  // `e2e` (Playwright specs) run under Playwright's own runner/tsconfig and use
+  // node + Playwright globals, not the browser app config — keep them out of the
+  // app lint pass. `playwright-report`/`coverage` are generated artifacts.
+  globalIgnores([
+    'dist',
+    'coverage',
+    'playwright-report',
+    'test-results',
+    'e2e',
+    'src/lib/api/schema.d.ts',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

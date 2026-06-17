@@ -20,6 +20,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Vitest owns *.test.* under src; Playwright owns e2e/*.spec.ts (which import
+    // @playwright/test and must NOT run under Vitest). Keeping the suffixes
+    // distinct keeps the two runners from fighting over the same files.
+    include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
