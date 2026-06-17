@@ -338,6 +338,8 @@ try
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
     builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
+    builder.Services.AddScoped<IReportQueryService, ReportQueryService>();
+    builder.Services.AddScoped<IAdminInventoryService, AdminInventoryService>();
 
     // Blob storage (product images → Azure Blob / Azurite). The client builds its
     // BlobServiceClient lazily, so a blank Storage:ConnectionString never breaks
