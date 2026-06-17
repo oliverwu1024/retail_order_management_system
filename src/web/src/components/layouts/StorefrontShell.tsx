@@ -3,11 +3,8 @@ import { Button } from '@/components/ui/button'
 import { useSessionActions } from '@/features/auth/useSessionActions'
 import { useCartQuery } from '@/features/cart/hooks/useCartQuery'
 import { apiClient } from '@/lib/api/client'
+import { ADMIN_AREA_ROLES } from '@/lib/auth/roleSets'
 import { useAuthStore } from '@/lib/store/auth-store'
-
-// Administrator-only for now — matches the Administrator-only backend admin endpoints
-// (StoreManager gets backed admin routes when the Phase 3 RBAC matrix lands).
-const ADMIN_ROLES = ['Administrator']
 
 /** Storefront layout: auth-aware header + routed content (React Router layout route). */
 export function StorefrontShell() {
@@ -15,7 +12,8 @@ export function StorefrontShell() {
   const { signOut } = useSessionActions()
   const user = useAuthStore((state) => state.user)
   const isLoading = useAuthStore((state) => state.isLoading)
-  const canAdmin = user?.roles.some((role) => ADMIN_ROLES.includes(role)) ?? false
+  // Any back-office role (Staff/StoreManager/Administrator) sees the Admin link → /admin (AdminShell).
+  const canAdmin = user?.roles.some((role) => ADMIN_AREA_ROLES.includes(role)) ?? false
   const isCustomer = user?.roles.includes('Customer') ?? false
   // The cart badge shows for everyone (guests included); shares the cart cache with /cart.
   const { data: cart } = useCartQuery()

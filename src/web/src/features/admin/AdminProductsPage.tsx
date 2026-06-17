@@ -1,10 +1,13 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DataTable, type Column } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Pagination } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/hooks/use-toast'
 import { FilterPanel } from '@/features/storefront/components/FilterPanel'
+import type { ProductSummary } from '@/lib/api/types'
 import { formatCents } from '@/lib/format'
 import { useAdminProductsQuery } from './hooks/useAdminProductsQuery'
 import { useDeleteProduct } from './hooks/useProductMutations'
@@ -12,10 +15,9 @@ import { useDeleteProduct } from './hooks/useProductMutations'
 const PAGE_SIZE = 20
 
 /**
- * Admin product table: URL-driven search / category filter / paging (same
- * pattern as the storefront, but against /catalog/admin/products so drafts
- * show too). Each row links to the edit form; the published column reflects
- * storefront visibility at a glance.
+ * Admin product table: URL-driven search / category filter / paging (same pattern as the storefront,
+ * but against /catalog/admin/products so drafts show too). Composed from the shared <DataTable />
+ * primitive (PHASE_3_SCOPE.md §3.6 — proving reuse), with each row linking to the edit form.
  */
 export function AdminProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -57,7 +59,54 @@ export function AdminProductsPage() {
     })
   }
 
-  const items = data?.items ?? []
+  const columns: Column<ProductSummary>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      cell: (product) => (
+        <Link
+          to={`/admin/products/${product.id}`}
+          className="font-medium text-primary hover:underline"
+        >
+          {product.name}
+        </Link>
+      ),
+    },
+    { key: 'sku', header: 'SKU', className: 'font-mono text-xs', cell: (product) => product.sku },
+    { key: 'brand', header: 'Brand', cell: (product) => product.brandName ?? '—' },
+    {
+      key: 'from',
+      header: 'From',
+      cell: (product) =>
+        product.fromPriceCents != null ? formatCents(product.fromPriceCents) : '—',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: (product) =>
+        product.isPublished ? (
+          <Badge variant="success">Published</Badge>
+        ) : (
+          <Badge variant="secondary">Draft</Badge>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      className: 'text-right',
+      cell: (product) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={deleteProduct.isPending}
+          onClick={() => product.id && onDelete(product.id, product.name ?? 'this product')}
+        >
+          Delete
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -83,61 +132,19 @@ export function AdminProductsPage() {
             <Skeleton key={index} className="h-12 w-full" />
           ))}
         </div>
-      ) : items.length > 0 ? (
+      ) : (
         <>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50 text-left text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Name</th>
-                  <th className="px-3 py-2 font-medium">SKU</th>
-                  <th className="px-3 py-2 font-medium">Brand</th>
-                  <th className="px-3 py-2 font-medium">From</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((product) => (
-                  <tr key={product.id} className="border-b last:border-0">
-                    <td className="px-3 py-2">
-                      <Link
-                        to={`/admin/products/${product.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {product.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{product.sku}</td>
-                    <td className="px-3 py-2">{product.brandName ?? '—'}</td>
-                    <td className="px-3 py-2">
-                      {product.fromPriceCents != null ? formatCents(product.fromPriceCents) : '—'}
-                    </td>
-                    <td className="px-3 py-2">
-                      {product.isPublished ? (
-                        <Badge variant="success">Published</Badge>
-                      ) : (
-                        <Badge variant="secondary">Draft</Badge>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={deleteProduct.isPending}
-                        onClick={() =>
-                          product.id && onDelete(product.id, product.name ?? 'this product')
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={data?.items ?? []}
+            getRowKey={(product) => product.id ?? ''}
+            empty={
+              <EmptyState
+                title="No products found"
+                description="Try a different search or filter."
+              />
+            }
+          />
           {data ? (
             <Pagination
               page={data.page ?? page}
@@ -148,8 +155,6 @@ export function AdminProductsPage() {
             />
           ) : null}
         </>
-      ) : (
-        <p className="text-sm text-muted-foreground">No products found.</p>
       )}
     </div>
   )
