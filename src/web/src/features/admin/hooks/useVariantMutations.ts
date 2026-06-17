@@ -58,6 +58,32 @@ export function useDeactivateVariant() {
 }
 
 /**
+ * Adjusts a variant's on-hand stock by a signed delta (Inventory.Adjust). The reason is
+ * recorded in the audit log server-side. Refreshes the product caches so the new stock shows.
+ */
+export function useAdjustInventory() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      productId: string
+      variantId: string
+      delta: number
+      reason: string
+    }): Promise<Schemas['StockDto']> => {
+      const { data, error } = await apiClient.POST('/api/v1/admin/inventory/{variantId}/adjust', {
+        params: { path: { variantId: vars.variantId } },
+        body: { delta: vars.delta, reason: vars.reason },
+      })
+      if (error || !data?.data) {
+        throw new Error('Failed to adjust stock.')
+      }
+      return data.data
+    },
+    onSuccess: (_data, vars) => invalidateProductCaches(queryClient, vars.productId),
+  })
+}
+
+/**
  * Reactivates a previously deactivated variant. There is no "un-delete" verb, so this
  * PUTs the variant's current attributes back with IsActive=true — the variant update
  * endpoint doubles as the reactivate path.

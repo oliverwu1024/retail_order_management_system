@@ -28,3 +28,7 @@ export type AdminUserPage = Schemas['AdminUserDtoPagedResult']
 export type AdminOrderSummary = Schemas['AdminOrderSummaryDto']
 export type AdminOrderDetail = Schemas['AdminOrderDetailDto']
 export type AdminOrderPage = Schemas['AdminOrderSummaryDtoPagedResult']
+
+export type AuditLog = Schemas['AuditLogDto']
+export type AuditLogPage = Schemas['AuditLogDtoPagedResult']
+export type SalesReport = Schemas['SalesReportDto']

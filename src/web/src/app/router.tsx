@@ -8,7 +8,9 @@ import { AdminHomePage } from '@/features/admin/AdminHomePage'
 import { AdminOrderDetailPage } from '@/features/admin/AdminOrderDetailPage'
 import { AdminOrdersPage } from '@/features/admin/AdminOrdersPage'
 import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
+import { AuditLogPage } from '@/features/admin/AuditLogPage'
 import { ProductFormPage } from '@/features/admin/ProductFormPage'
+import { ReportsPage } from '@/features/admin/ReportsPage'
 import { UsersPage } from '@/features/admin/UsersPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
@@ -130,7 +132,10 @@ export const router = createBrowserRouter([
         path: 'inventory',
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.inventory}>
-            <AdminComingSoon title="Inventory" note="Stock adjustments land in Chunk 3." />
+            <AdminComingSoon
+              title="Inventory"
+              note="Adjust on-hand stock per variant from a product’s edit page (Products → open a product → Variants → Adjust). A dedicated inventory dashboard is a later enhancement."
+            />
           </RoleGuard>
         ),
       },
@@ -138,7 +143,7 @@ export const router = createBrowserRouter([
         path: 'audit',
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.audit}>
-            <AdminComingSoon title="Audit log" note="The audit-log viewer lands in Chunk 3." />
+            <AuditLogPage />
           </RoleGuard>
         ),
       },
@@ -146,7 +151,7 @@ export const router = createBrowserRouter([
         path: 'reports',
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.reports}>
-            <AdminComingSoon title="Reports" note="Sales-by-day reporting lands in Chunk 3." />
+            <ReportsPage />
           </RoleGuard>
         ),
       },

@@ -4,6 +4,106 @@
  */
 
 export interface paths {
+    "/api/v1/admin/inventory/{variantId}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    variantId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdjustInventoryRequest"];
+                    "text/json": components["schemas"]["AdjustInventoryRequest"];
+                    "application/*+json": components["schemas"]["AdjustInventoryRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["StockDtoApiResponse"];
+                        "application/json": components["schemas"]["StockDtoApiResponse"];
+                        "text/json": components["schemas"]["StockDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/orders": {
         parameters: {
             query?: never;
@@ -482,6 +582,135 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/sales-by-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    From?: string;
+                    To?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SalesReportDtoApiResponse"];
+                        "application/json": components["schemas"]["SalesReportDtoApiResponse"];
+                        "text/json": components["schemas"]["SalesReportDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Actor?: string;
+                    EntityType?: string;
+                    EntityId?: string;
+                    From?: string;
+                    To?: string;
+                    Page?: number;
+                    PageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["AuditLogDtoPagedResultApiResponse"];
+                        "application/json": components["schemas"]["AuditLogDtoPagedResultApiResponse"];
+                        "text/json": components["schemas"]["AuditLogDtoPagedResultApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2302,6 +2531,11 @@ export interface components {
             isDefaultShipping?: boolean;
             isDefaultBilling?: boolean;
         };
+        AdjustInventoryRequest: {
+            /** Format: int32 */
+            delta?: number;
+            reason?: string | null;
+        };
         AdminOrderDetailDto: {
             /** Format: uuid */
             id?: string;
@@ -2421,6 +2655,40 @@ export interface components {
             /** Format: date-time */
             timestamp?: string;
         };
+        AuditLogDto: {
+            /** Format: int64 */
+            id?: number;
+            actor?: string | null;
+            action?: string | null;
+            entityType?: string | null;
+            entityId?: string | null;
+            beforeJson?: string | null;
+            afterJson?: string | null;
+            /** Format: date-time */
+            occurredAt?: string;
+        };
+        AuditLogDtoPagedResult: {
+            items?: components["schemas"]["AuditLogDto"][] | null;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            readonly totalPages?: number;
+            readonly hasNext?: boolean;
+            readonly hasPrevious?: boolean;
+        };
+        AuditLogDtoPagedResultApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["AuditLogDtoPagedResult"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
         AuthUserDto: {
             id?: string | null;
             email?: string | null;
@@ -2502,6 +2770,11 @@ export interface components {
             /** Format: date-time */
             timestamp?: string;
         };
+        CategorySalesDto: {
+            category?: string | null;
+            /** Format: int64 */
+            totalSalesCents?: number;
+        };
         CheckoutSessionResponse: {
             url?: string | null;
         };
@@ -2566,6 +2839,13 @@ export interface components {
             traceId?: string | null;
             /** Format: date-time */
             timestamp?: string;
+        };
+        DailySalesDto: {
+            date?: string | null;
+            /** Format: int32 */
+            orderCount?: number;
+            /** Format: int64 */
+            totalSalesCents?: number;
         };
         HealthPayload: {
             service: string | null;
@@ -2798,6 +3078,19 @@ export interface components {
         ReorderProductImagesRequest: {
             imageIds?: string[] | null;
         };
+        SalesReportDto: {
+            days?: components["schemas"]["DailySalesDto"][] | null;
+            categories?: components["schemas"]["CategorySalesDto"][] | null;
+        };
+        SalesReportDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["SalesReportDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
         ShipmentDto: {
             carrier?: string | null;
             trackingNumber?: string | null;
@@ -2809,6 +3102,25 @@ export interface components {
         };
         StartCheckoutRequest: {
             returnBaseUrl?: string | null;
+        };
+        StockDto: {
+            /** Format: uuid */
+            productVariantId?: string;
+            /** Format: int32 */
+            onHand?: number;
+            /** Format: int32 */
+            reserved?: number;
+            /** Format: int32 */
+            available?: number;
+        };
+        StockDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["StockDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
         };
         UpdateCartItemRequest: {
             /** Format: int32 */

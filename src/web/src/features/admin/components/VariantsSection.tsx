@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import type { ProductVariant } from '@/lib/api/types'
 import { formatCents } from '@/lib/format'
 import {
   useAddVariant,
+  useAdjustInventory,
   useDeactivateVariant,
   useReactivateVariant,
 } from '../hooks/useVariantMutations'
@@ -54,6 +57,7 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
   const deactivateVariant = useDeactivateVariant()
   const reactivateVariant = useReactivateVariant()
   const mutating = deactivateVariant.isPending || reactivateVariant.isPending
+  const [adjustTarget, setAdjustTarget] = useState<ProductVariant | null>(null)
 
   const {
     register,
@@ -154,15 +158,26 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
                           Reactivate
                         </Button>
                       ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={mutating || !variant.id}
-                          onClick={() => variant.id && onDeactivate(variant.id)}
-                        >
-                          Deactivate
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={!variant.id}
+                            onClick={() => setAdjustTarget(variant)}
+                          >
+                            Adjust
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={mutating || !variant.id}
+                            onClick={() => variant.id && onDeactivate(variant.id)}
+                          >
+                            Deactivate
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -268,6 +283,106 @@ export function VariantsSection({ productId, variants }: VariantsSectionProps) {
           {addVariant.isPending ? 'Adding…' : 'Add variant'}
         </Button>
       </form>
+
+      {adjustTarget ? (
+        <AdjustStockModal
+          productId={productId}
+          variant={adjustTarget}
+          onClose={() => setAdjustTarget(null)}
+        />
+      ) : null}
     </section>
+  )
+}
+
+/**
+ * Stock-adjustment modal: a signed delta + a reason, posted to the inventory-adjust endpoint.
+ * The delta must be a non-zero integer and the reason non-empty (mirrors the server validator);
+ * the reason is recorded in the audit log.
+ */
+function AdjustStockModal({
+  productId,
+  variant,
+  onClose,
+}: {
+  productId: string
+  variant: ProductVariant
+  onClose: () => void
+}) {
+  const adjustInventory = useAdjustInventory()
+  const [delta, setDelta] = useState('')
+  const [reason, setReason] = useState('')
+
+  const parsedDelta = Number(delta)
+  const valid =
+    delta.trim() !== '' &&
+    Number.isInteger(parsedDelta) &&
+    parsedDelta !== 0 &&
+    reason.trim().length > 0
+
+  function onSubmit() {
+    if (!valid || !variant.id) {
+      return
+    }
+    adjustInventory.mutate(
+      { productId, variantId: variant.id, delta: parsedDelta, reason: reason.trim() },
+      {
+        onSuccess: (stock) => {
+          toast({ title: 'Stock adjusted', description: `On-hand is now ${stock.onHand}.` })
+          onClose()
+        },
+        onError: () => toast({ variant: 'destructive', title: 'Couldn’t adjust stock' }),
+      },
+    )
+  }
+
+  return (
+    <Modal
+      open
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
+      title={`Adjust stock · ${variant.sku}`}
+      description="Apply a signed change to on-hand stock. The reason is recorded in the audit log."
+    >
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="adjust-delta" className="text-xs font-medium">
+            Delta (e.g. 10 or -3)
+          </label>
+          <Input
+            id="adjust-delta"
+            type="number"
+            step="1"
+            value={delta}
+            onChange={(e) => setDelta(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="adjust-reason" className="text-xs font-medium">
+            Reason
+          </label>
+          <Input
+            id="adjust-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Cycle count, damage, restock…"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={adjustInventory.isPending}
+          >
+            Cancel
+          </Button>
+          <Button type="button" onClick={onSubmit} disabled={!valid || adjustInventory.isPending}>
+            {adjustInventory.isPending ? 'Saving…' : 'Apply'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
