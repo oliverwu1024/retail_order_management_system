@@ -124,7 +124,7 @@ Both get `DbSet`s + `IEntityTypeConfiguration` classes; `RetailDbContext` gains 
 
 - One `AddAuthorization` block in `Program.cs` registers the §3.1 policies, each `policy.RequireRole(...)` with names from `Roles.cs`. Policy-name constants live in `Common/Constants/Roles.cs` (`Roles.Policies.*`).
 - New admin endpoints use `[Authorize(Policy = Policies.X)]`. Catalog writes migrate to `Policies.CatalogManage`. Storefront `Customer` attributes unchanged.
-- **Order-state guards** are not authorization — invalid transitions (e.g. ship an already-`Fulfilled` order, refund a `Cancelled` one) throw `ConflictException` → 409; concurrent transitions are serialized by `Order.RowVersion` → 409 (the Phase-2 pattern). Refundable states = `{Paid, Fulfilled}` → `Refunding` → `Refunded`.
+- **Order-state guards** are not authorization — invalid transitions (e.g. ship an already-`Fulfilled` order, refund a `Cancelled` one) throw `ConflictException` → 409; the ship + refund status transitions are serialized by `Order.RowVersion` → 409 (the Phase-2 pattern). **Refundable state = `Paid` only** → `Refunding` → `Refunded` (revised from the original `{Paid, Fulfilled}` after the Chunk-2 review: refunding a *shipped* order would restock goods already with the customer and strand the shipment — a **return/RMA flow, deferred**). `Refunding` is also accepted as a **recovery** state (a refund that succeeded at Stripe but failed to finish the local reversal is re-drivable, since every step is idempotent).
 
 ## 7. Audit trail design
 
@@ -135,7 +135,7 @@ See §3.2. Monitored allowlist `{Product, InventoryItem, Order, Payment, Shipmen
 - **Admin query** (`IAdminOrderService` / `AdminOrderRepository`): all-orders paged, filters `status` / date range / `customerEmail` / `hasAnomaly` (no-op placeholder), ordered by `PlacedAt` desc (backed by `IX_Order_Status_PlacedAt`). Detail includes payments + shipment.
 - **Mark Shipped** (`Orders.Fulfill`): create `Shipment(Carrier, TrackingNumber, Status=Shipped, ShippedAt)`, flip `Order.Status Paid→Fulfilled` under `RowVersion`, write a `Shipped` audit row — one transaction.
 - **Mark Delivered** (`Orders.Fulfill`): `Shipment.Status → Delivered`, `DeliveredAt`.
-- **Admin Refund** (`Orders.Refund`): generalize the Phase-2 refund machinery (`TryClaimForRefund` to allow `{Paid, Fulfilled} → Refunding`, `StripeRefundGateway` with the deterministic `refund:{pi}` idempotency key, then the idempotent `OrderRefundService` reversal) initiated by an authenticated actor, plus a `Refund` audit row. Reuses, not duplicates, the existing reversal.
+- **Admin Refund** (`Orders.Refund`): reuse the Phase-2 refund machinery — a `Paid`-only admin claim (`TryClaimForRefundByIdAsync`, `Paid → Refunding`), `StripeRefundGateway` with the deterministic `refund:{pi}` idempotency key, then the idempotent `OrderRefundService` reversal — initiated by an authenticated actor, plus a named `Refund` audit row **staged before the reversal so it commits in the same transaction**. The whole path is re-drivable from `Refunding` (recovery). Reuses, not duplicates, the existing reversal. *(Shipped-order refunds = a return/RMA flow, deferred to a later phase.)*
 
 ## 9. Reporting — sales-by-day
 

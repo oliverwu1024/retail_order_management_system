@@ -151,6 +151,40 @@ public sealed class OrderRepository : IOrderRepository
                 ct);
 
     /// <inheritdoc />
+    public async Task<Order?> GetTrackedWithShipmentAsync(Guid orderId, CancellationToken ct) =>
+        await _db.Orders.Include(o => o.Shipment).FirstOrDefaultAsync(o => o.Id == orderId, ct);
+
+    /// <inheritdoc />
+    public async Task<bool> TryClaimForRefundByIdAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct)
+    {
+        // Same optimistic claim as TryClaimForRefundAsync but admin-scoped (no owner filter). Paid
+        // ONLY: a shipped/Fulfilled order is a return/RMA case (deferred), and refunding it would
+        // restock goods already with the customer. Set-based UPDATE bypasses the interceptor, so the
+        // audit fields are stamped here.
+        int affected = await _db.Orders
+            .Where(o => o.Id == orderId && o.Status == OrderStatus.Paid)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(o => o.Status, OrderStatus.Refunding)
+                    .SetProperty(o => o.UpdatedAt, now)
+                    .SetProperty(o => o.UpdatedBy, actor),
+                ct);
+        return affected == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task ReleaseRefundClaimToAsync(
+        Guid orderId, OrderStatus toStatus, DateTimeOffset now, string actor, CancellationToken ct) =>
+        await _db.Orders
+            .Where(o => o.Id == orderId && o.Status == OrderStatus.Refunding)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(o => o.Status, toStatus)
+                    .SetProperty(o => o.UpdatedAt, now)
+                    .SetProperty(o => o.UpdatedBy, actor),
+                ct);
+
+    /// <inheritdoc />
     public void AddOrder(Order order) =>
         _db.Orders.Add(order);
 

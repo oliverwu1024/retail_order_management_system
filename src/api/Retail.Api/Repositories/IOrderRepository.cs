@@ -37,6 +37,16 @@ public interface IOrderRepository
     /// <summary>Admin order detail (NOT owner-scoped): lines + payments + shipment + the buyer's profile/user.</summary>
     Task<Order?> GetDetailForAdminAsync(Guid orderId, CancellationToken ct);
 
+    /// <summary>Tracked order (with its shipment) for fulfilment writes (mark shipped / delivered).</summary>
+    Task<Order?> GetTrackedWithShipmentAsync(Guid orderId, CancellationToken ct);
+
+    /// <summary>Admin refund claim: atomically flip {Paid, Fulfilled} → Refunding (NOT owner-scoped). True if won.</summary>
+    Task<bool> TryClaimForRefundByIdAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct);
+
+    /// <summary>Revert a refund claim (Refunding → <paramref name="toStatus"/>) — rolls back a failed Stripe refund.</summary>
+    Task ReleaseRefundClaimToAsync(
+        Guid orderId, Common.Enums.OrderStatus toStatus, DateTimeOffset now, string actor, CancellationToken ct);
+
     /// <summary>The PaymentIntent id of an order's charge (positive payment), for issuing a refund. Null if none.</summary>
     Task<string?> GetChargePaymentIntentIdAsync(Guid orderId, CancellationToken ct);
 

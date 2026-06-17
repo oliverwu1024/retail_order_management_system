@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Retail.Api.Common.Enums;
 using Retail.Api.Data;
@@ -94,6 +95,114 @@ public class AdminOrderFlowTests
         Assert.Equal(pendingId.ToString(), order.GetProperty("id").GetString());
     }
 
+    [Fact]
+    public async Task MarkShipped_Staff_SetsFulfilledAndShipment_AndAudits()
+    {
+        string email = $"guest-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, email, withCharge: true);
+
+        (HttpClient staff, string csrf) = await StaffClientAsync();
+        JsonElement data = await DataAsync(await PostJsonAsync(staff, $"/api/v1/admin/orders/{orderId}/ship",
+            new { carrier = "AusPost", trackingNumber = "TRK123" }, csrf));
+
+        Assert.Equal("Fulfilled", data.GetProperty("status").GetString());
+        JsonElement shipment = data.GetProperty("shipment");
+        Assert.Equal("Shipped", shipment.GetProperty("status").GetString());
+        Assert.Equal("AusPost", shipment.GetProperty("carrier").GetString());
+        Assert.True(await HasAuditRowAsync("Shipped", "Order", orderId.ToString()));
+    }
+
+    [Fact]
+    public async Task MarkShipped_NonPaidOrder_Returns409()
+    {
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Pending, $"g-{Guid.NewGuid():N}@test.local");
+        (HttpClient staff, string csrf) = await StaffClientAsync();
+        HttpResponseMessage resp = await PostJsonAsync(staff, $"/api/v1/admin/orders/{orderId}/ship",
+            new { carrier = "AusPost", trackingNumber = "TRK1" }, csrf);
+        Assert.Equal(HttpStatusCode.Conflict, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MarkShipped_Customer_Returns403()
+    {
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, $"g-{Guid.NewGuid():N}@test.local", withCharge: true);
+        (HttpClient customer, string csrf) = await CustomerClientAsync();
+        HttpResponseMessage resp = await PostJsonAsync(customer, $"/api/v1/admin/orders/{orderId}/ship",
+            new { carrier = "X", trackingNumber = "Y" }, csrf);
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task MarkDelivered_AfterShip_SetsDelivered()
+    {
+        string email = $"g-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, email, withCharge: true);
+        (HttpClient staff, string csrf) = await StaffClientAsync();
+        (await PostJsonAsync(staff, $"/api/v1/admin/orders/{orderId}/ship",
+            new { carrier = "AusPost", trackingNumber = "T1" }, csrf)).EnsureSuccessStatusCode();
+
+        JsonElement data = await DataAsync(await PostAsync(staff, $"/api/v1/admin/orders/{orderId}/deliver", csrf));
+        Assert.Equal("Delivered", data.GetProperty("shipment").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Refund_Manager_RefundsRestocksAndAudits()
+    {
+        string email = $"g-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, Guid variantId) = await SeedOrderAsync(OrderStatus.Paid, email, onHand: 4, withCharge: true);
+        int before = await ReadOnHandAsync(variantId);
+
+        (HttpClient manager, string csrf) = await StoreManagerClientAsync();
+        JsonElement data = await DataAsync(await PostAsync(manager, $"/api/v1/admin/orders/{orderId}/refund", csrf));
+
+        Assert.Equal("Refunded", data.GetProperty("status").GetString());
+        Assert.Equal(before + 1, await ReadOnHandAsync(variantId)); // the one line unit is restocked
+        Assert.Contains(data.GetProperty("payments").EnumerateArray(),
+            payment => payment.GetProperty("amountCents").GetInt32() < 0); // a negative refund row
+        Assert.True(await HasAuditRowAsync("Refund", "Order", orderId.ToString()));
+    }
+
+    [Fact]
+    public async Task Refund_Staff_Returns403()
+    {
+        // Orders.Refund is StoreManager + Administrator only — Staff can fulfil but not refund.
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, $"g-{Guid.NewGuid():N}@test.local", withCharge: true);
+        (HttpClient staff, string csrf) = await StaffClientAsync();
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await PostAsync(staff, $"/api/v1/admin/orders/{orderId}/refund", csrf)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Refund_FulfilledOrder_Returns409()
+    {
+        // A shipped (Fulfilled) order is a return/RMA case — refunding it would restock goods already
+        // with the customer. Phase 3 refunds Paid orders only.
+        string email = $"g-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, email, withCharge: true);
+        (HttpClient staff, string staffCsrf) = await StaffClientAsync();
+        (await PostJsonAsync(staff, $"/api/v1/admin/orders/{orderId}/ship",
+            new { carrier = "AusPost", trackingNumber = "T1" }, staffCsrf)).EnsureSuccessStatusCode();
+
+        (HttpClient manager, string csrf) = await StoreManagerClientAsync();
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await PostAsync(manager, $"/api/v1/admin/orders/{orderId}/refund", csrf)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Refund_FromRefundingState_Recovers()
+    {
+        // A wedged Refunding order (a prior attempt refunded at Stripe but didn't finish the local
+        // reversal) is re-drivable: the refund re-applies idempotently and completes to Refunded.
+        string email = $"g-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Refunding, email, withCharge: true);
+
+        (HttpClient manager, string csrf) = await StoreManagerClientAsync();
+        JsonElement data = await DataAsync(await PostAsync(manager, $"/api/v1/admin/orders/{orderId}/refund", csrf));
+
+        Assert.Equal("Refunded", data.GetProperty("status").GetString());
+        Assert.True(await HasAuditRowAsync("Refund", "Order", orderId.ToString()));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(Guid OrderId, Guid VariantId)> SeedOrderAsync(
@@ -163,6 +272,31 @@ public class AdminOrderFlowTests
 
     private Task<(HttpClient Client, string Csrf)> StaffClientAsync() =>
         LoginAsync("staff@test.local", "TestStaff123456");
+
+    private Task<(HttpClient Client, string Csrf)> StoreManagerClientAsync() =>
+        LoginAsync("manager@test.local", "TestManager123456");
+
+    private async Task<bool> HasAuditRowAsync(string action, string entityType, string entityId)
+    {
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        return await db.AuditLogs.AsNoTracking()
+            .AnyAsync(a => a.Action == action && a.EntityType == entityType && a.EntityId == entityId);
+    }
+
+    private async Task<int> ReadOnHandAsync(Guid variantId)
+    {
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        return (await db.InventoryItems.AsNoTracking().FirstAsync(i => i.ProductVariantId == variantId)).OnHand;
+    }
+
+    private static Task<HttpResponseMessage> PostAsync(HttpClient client, string path, string csrf)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
+        request.Headers.Add("X-CSRF-Token", csrf);
+        return client.SendAsync(request);
+    }
 
     private async Task<(HttpClient Client, string Csrf)> LoginAsync(string email, string password)
     {
