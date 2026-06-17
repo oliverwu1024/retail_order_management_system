@@ -63,14 +63,16 @@ public sealed class OrdersController : ControllerBase
     [HttpGet]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<OrderSummaryDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> ListMyOrders([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListMyOrders([FromQuery] OrderListQuery query, CancellationToken ct = default)
     {
         if (!TryGetUserId(out string userId))
         {
             return Unauthorized(ApiResponse.Fail("Not authenticated."));
         }
 
-        PagedResult<OrderSummaryDto> result = await _orders.GetMyOrdersAsync(userId, page, pageSize, ct);
+        PagedResult<OrderSummaryDto> result = await _orders.GetMyOrdersAsync(userId, query.Page, query.PageSize, ct);
         return Ok(ApiResponse<PagedResult<OrderSummaryDto>>.Ok(result));
     }
 
@@ -78,6 +80,8 @@ public sealed class OrdersController : ControllerBase
     [HttpGet("{id:guid}")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMyOrder(Guid id, CancellationToken ct)
     {
@@ -108,6 +112,8 @@ public sealed class OrdersController : ControllerBase
     [HttpPost("{id:guid}/cancel")]
     [Authorize(Roles = Roles.Customer)]
     [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CancelMyOrder(Guid id, CancellationToken ct)
