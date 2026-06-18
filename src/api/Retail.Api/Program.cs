@@ -12,6 +12,8 @@ using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Retail.Api.Ai;
+using Retail.Api.Ai.Providers;
 using Retail.Api.Common.Abstractions;
 using Retail.Api.Common.Constants;
 using Retail.Api.Common.Helpers;
@@ -337,6 +339,37 @@ try
     // ── Reviews (Phase 4) ────────────────────────────────────────────────────
     builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
     builder.Services.AddScoped<IReviewService, ReviewService>();
+
+    // ── AI: CopyGen (Phase 4) ─────────────────────────────────────────────────
+    // Stub-first (ADR-0005): Ai:Mode defaults to "stub", so a fresh clone, the tests, and CI all
+    // run with no key and no network. Outside Development, live mode with a blank key fails fast at
+    // boot (mirrors Stripe/Jwt). Flipping to live is config only — services see only ILlmClient.
+    OptionsBuilder<AiSettings> aiOptions = builder.Services
+        .AddOptions<AiSettings>()
+        .Bind(builder.Configuration.GetSection(AiSettings.SectionName));
+    if (!builder.Environment.IsDevelopment())
+    {
+        aiOptions
+            .Validate(
+                o => !o.IsLive || !string.IsNullOrWhiteSpace(o.ApiKey),
+                "Ai:ApiKey must be configured when Ai:Mode=live outside Development (User Secrets / Key Vault).")
+            .ValidateOnStart();
+    }
+    builder.Services.AddScoped<StubLlmClient>();
+    builder.Services.AddHttpClient<AnthropicLlmClient>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.anthropic.com");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    }).AddStandardResilienceHandler(); // Polly: retry + circuit breaker + timeout
+    // Single ILlmClient binding — business code never sees a concrete provider type.
+    builder.Services.AddScoped<ILlmClient>(sp =>
+    {
+        AiSettings ai = sp.GetRequiredService<IOptions<AiSettings>>().Value;
+        return ai.IsLive
+            ? sp.GetRequiredService<AnthropicLlmClient>()
+            : sp.GetRequiredService<StubLlmClient>();
+    });
+    builder.Services.AddScoped<ICopyGenService, CopyGenService>();
 
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();

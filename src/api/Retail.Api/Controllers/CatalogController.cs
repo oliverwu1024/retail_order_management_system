@@ -28,6 +28,8 @@ public sealed class CatalogController : ControllerBase
     private readonly IValidator<CreateVariantRequest> _createVariantValidator;
     private readonly IValidator<UpdateVariantRequest> _updateVariantValidator;
     private readonly IValidator<UpdateProductImageRequest> _updateImageValidator;
+    private readonly ICopyGenService _copyGen;
+    private readonly IValidator<SuggestDescriptionRequest> _suggestCopyValidator;
 
     public CatalogController(
         ICatalogService catalog,
@@ -36,7 +38,9 @@ public sealed class CatalogController : ControllerBase
         IValidator<UpdateProductRequest> updateProductValidator,
         IValidator<CreateVariantRequest> createVariantValidator,
         IValidator<UpdateVariantRequest> updateVariantValidator,
-        IValidator<UpdateProductImageRequest> updateImageValidator)
+        IValidator<UpdateProductImageRequest> updateImageValidator,
+        ICopyGenService copyGen,
+        IValidator<SuggestDescriptionRequest> suggestCopyValidator)
     {
         _catalog = catalog;
         _createCategoryValidator = createCategoryValidator;
@@ -45,6 +49,8 @@ public sealed class CatalogController : ControllerBase
         _createVariantValidator = createVariantValidator;
         _updateVariantValidator = updateVariantValidator;
         _updateImageValidator = updateImageValidator;
+        _copyGen = copyGen;
+        _suggestCopyValidator = suggestCopyValidator;
     }
 
     // ── Public reads ────────────────────────────────────────────────────────────
@@ -150,6 +156,25 @@ public sealed class CatalogController : ControllerBase
 
         ProductDetailDto product = await _catalog.UpdateProductAsync(id, request, ct);
         return Ok(ApiResponse<ProductDetailDto>.Ok(product));
+    }
+
+    /// <summary>Generates AI product copy (description + SEO + bullet points). Returned for review — never saved.</summary>
+    [HttpPost("products/{id:guid}/generate-copy")]
+    [Authorize(Policy = Roles.Policies.CatalogManage)]
+    [ProducesResponseType(typeof(ApiResponse<SuggestProductCopyResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> GenerateCopy(Guid id, [FromBody] SuggestDescriptionRequest request, CancellationToken ct)
+    {
+        if (await ValidateAsync(_suggestCopyValidator, request, ct) is { } invalid)
+        {
+            return invalid;
+        }
+
+        SuggestProductCopyResponse copy = await _copyGen.GenerateAsync(id, request, ct);
+        return Ok(ApiResponse<SuggestProductCopyResponse>.Ok(copy));
     }
 
     /// <summary>Soft-deletes a product (recoverable; hidden from the storefront).</summary>

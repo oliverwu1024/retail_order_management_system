@@ -126,6 +126,11 @@ public class ExceptionMiddleware
             BusinessRuleException =>
                 (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE", ex.Message),
 
+            // An upstream dependency (the AI provider, etc.) failed after retries. The request was
+            // valid; the dependency is unavailable — 503, not a client error.
+            ExternalServiceException =>
+                (StatusCodes.Status503ServiceUnavailable, "EXTERNAL_SERVICE_UNAVAILABLE", ex.Message),
+
             // Not enough available stock (OnHand − Reserved) to satisfy a reservation/purchase.
             OutOfStockException =>
                 (StatusCodes.Status409Conflict, "INVENTORY_INSUFFICIENT", ex.Message),
