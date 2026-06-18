@@ -31,6 +31,9 @@ public interface IProductRepository
     /// <summary>Read-only product by id (any publish state, non-deleted) with category + variants + stock — for the admin edit form.</summary>
     Task<Product?> GetDetailByIdAsync(Guid id, CancellationToken ct);
 
+    /// <summary>Whether a (non-deleted) product with this id exists — a lightweight existence check.</summary>
+    Task<bool> ExistsByIdAsync(Guid id, CancellationToken ct);
+
     /// <summary>Stages a new product for insert.</summary>
     Task AddAsync(Product product, CancellationToken ct);
 

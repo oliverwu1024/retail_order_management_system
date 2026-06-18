@@ -334,6 +334,10 @@ try
     builder.Services.AddScoped<IOrderQueryService, OrderQueryService>();
     builder.Services.AddScoped<IOrderCancellationService, OrderCancellationService>();
 
+    // ── Reviews (Phase 4) ────────────────────────────────────────────────────
+    builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+    builder.Services.AddScoped<IReviewService, ReviewService>();
+
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();

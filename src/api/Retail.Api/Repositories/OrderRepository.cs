@@ -29,6 +29,15 @@ public sealed class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.Payments.Any(p => p.StripePaymentIntentId == paymentIntentId), ct);
 
     /// <inheritdoc />
+    public async Task<bool> HasPurchasedProductAsync(Guid customerProfileId, Guid productId, CancellationToken ct) =>
+        await _db.Orders
+            .AsNoTracking()
+            .Where(o => o.CustomerProfileId == customerProfileId
+                && (o.Status == OrderStatus.Paid || o.Status == OrderStatus.Fulfilled))
+            .SelectMany(o => o.Lines)
+            .AnyAsync(line => line.ProductVariant!.ProductId == productId, ct);
+
+    /// <inheritdoc />
     public async Task<(IReadOnlyList<Order> Items, int Total)> GetPagedByProfileAsync(
         Guid customerProfileId, int page, int pageSize, CancellationToken ct)
     {

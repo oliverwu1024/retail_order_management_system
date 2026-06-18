@@ -121,6 +121,11 @@ public class ExceptionMiddleware
             ConflictException =>
                 (StatusCodes.Status409Conflict, "CONFLICT", ex.Message),
 
+            // A business precondition that needs state to check (e.g. reviewing a product you
+            // never bought) — well-formed and authorized, but semantically unprocessable.
+            BusinessRuleException =>
+                (StatusCodes.Status422UnprocessableEntity, "BUSINESS_RULE", ex.Message),
+
             // Not enough available stock (OnHand − Reserved) to satisfy a reservation/purchase.
             OutOfStockException =>
                 (StatusCodes.Status409Conflict, "INVENTORY_INSUFFICIENT", ex.Message),

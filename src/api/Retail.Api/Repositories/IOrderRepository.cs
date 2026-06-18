@@ -26,6 +26,12 @@ public interface IOrderRepository
     /// <summary>An order by id scoped to its owner, with lines, read-only. Null if missing or not the caller's.</summary>
     Task<Order?> GetOwnedByIdAsync(Guid orderId, Guid customerProfileId, CancellationToken ct);
 
+    /// <summary>
+    /// Whether the customer has a completed purchase (an order in <c>Paid</c>/<c>Fulfilled</c>) with a
+    /// line for any variant of the product — the "verified purchase" gate for reviews (Story 4.1).
+    /// </summary>
+    Task<bool> HasPurchasedProductAsync(Guid customerProfileId, Guid productId, CancellationToken ct);
+
     /// <summary>An order (with lines) by Stripe session id — the guest bearer lookup. Read-only. Null if none.</summary>
     Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct);
 

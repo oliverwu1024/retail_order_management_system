@@ -128,6 +128,10 @@ public sealed class ProductRepository : IProductRepository
             .FirstOrDefaultAsync(ct);
 
     /// <inheritdoc />
+    public async Task<bool> ExistsByIdAsync(Guid id, CancellationToken ct) =>
+        await _db.Products.AnyAsync(p => p.Id == id, ct);
+
+    /// <inheritdoc />
     public async Task AddAsync(Product product, CancellationToken ct) =>
         await _db.Products.AddAsync(product, ct);
 
