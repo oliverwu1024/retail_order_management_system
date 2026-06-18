@@ -114,9 +114,18 @@ export function ProductForm({
             <SuggestDescriptionButton
               productId={productId}
               onApply={(copy) => {
-                setValue('description', copy.description ?? '', { shouldDirty: true })
-                setValue('seoTitle', copy.seoTitle ?? '', { shouldDirty: true })
-                setValue('seoDescription', copy.seoMetaDescription ?? '', { shouldDirty: true })
+                setValue('description', copy.description ?? '', {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+                setValue('seoTitle', copy.seoTitle ?? '', {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+                setValue('seoDescription', copy.seoMetaDescription ?? '', {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
               }}
             />
           ) : null}

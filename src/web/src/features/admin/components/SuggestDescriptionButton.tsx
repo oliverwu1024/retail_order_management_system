@@ -97,15 +97,15 @@ export function SuggestDescriptionButton({ productId, onApply }: SuggestDescript
 
           {result ? (
             <div className="space-y-3 rounded-md border bg-muted/30 p-3 text-sm">
-              <Field label="Description">{result.description}</Field>
-              <Field label="SEO title">{result.seoTitle}</Field>
-              <Field label="SEO description">{result.seoMetaDescription}</Field>
+              <Field label="Description">{result.description ?? '—'}</Field>
+              <Field label="SEO title">{result.seoTitle ?? '—'}</Field>
+              <Field label="SEO description">{result.seoMetaDescription ?? '—'}</Field>
               {result.bulletPoints?.length ? (
                 <div>
                   <p className="font-medium">Bullet points</p>
                   <ul className="list-disc pl-5 text-muted-foreground">
-                    {result.bulletPoints.map((point, index) => (
-                      <li key={index}>{point}</li>
+                    {result.bulletPoints.map((point) => (
+                      <li key={point}>{point}</li>
                     ))}
                   </ul>
                 </div>

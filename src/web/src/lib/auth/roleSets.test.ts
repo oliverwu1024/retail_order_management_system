@@ -37,6 +37,12 @@ describe('ROLE_SETS capability matrix', () => {
     }
   })
 
+  it('limits review sentiment to StoreManager and Administrator (Staff excluded, mirrors Sentiment.View)', () => {
+    expect(hasAnyRole(['Staff'], ROLE_SETS.sentiment)).toBe(false)
+    expect(hasAnyRole(['StoreManager'], ROLE_SETS.sentiment)).toBe(true)
+    expect(hasAnyRole(['Administrator'], ROLE_SETS.sentiment)).toBe(true)
+  })
+
   it('admits all three back-office roles to the view-level areas', () => {
     for (const set of [ROLE_SETS.orders, ROLE_SETS.inventory, ROLE_SETS.audit, ROLE_SETS.reports]) {
       expect(set).toEqual(ADMIN_AREA_ROLES)
