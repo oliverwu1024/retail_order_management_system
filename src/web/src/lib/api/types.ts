@@ -17,6 +17,11 @@ export type Address = Schemas['AddressDto']
 export type Cart = Schemas['CartDto']
 export type CartItem = Schemas['CartItemDto']
 
+export type Review = Schemas['ReviewDto']
+export type ReviewList = Schemas['ReviewListDto']
+export type ReviewSummary = Schemas['ReviewSummaryDto']
+export type ReviewPage = Schemas['ReviewDtoPagedResult']
+
 export type OrderSummary = Schemas['OrderSummaryDto']
 export type OrderDetail = Schemas['OrderDetailDto']
 export type OrderLine = Schemas['OrderLineDto']

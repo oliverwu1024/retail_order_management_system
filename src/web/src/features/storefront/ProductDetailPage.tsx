@@ -7,6 +7,7 @@ import { useAddToCart } from '@/features/cart/hooks/useCartMutations'
 import { toast } from '@/hooks/use-toast'
 import { formatCents } from '@/lib/format'
 import { ProductGallery } from './components/ProductGallery'
+import { ProductReviews } from './components/ProductReviews'
 import { StockBadge } from './components/StockBadge'
 import { VariantSelector } from './components/VariantSelector'
 import { useProductQuery } from './hooks/useProductQuery'
@@ -60,8 +61,9 @@ export function ProductDetailPage() {
   }
 
   return (
-    <div className="grid gap-8 md:grid-cols-2">
-      {/* Keyed by the selected variant so the gallery resets to that variant's first image. */}
+    <div className="space-y-12">
+      <div className="grid gap-8 md:grid-cols-2">
+        {/* Keyed by the selected variant so the gallery resets to that variant's first image. */}
       <ProductGallery
         key={selected?.id ?? 'base'}
         images={product.images ?? []}
@@ -129,6 +131,9 @@ export function ProductDetailPage() {
           <p className="whitespace-pre-line text-sm text-muted-foreground">{product.description}</p>
         ) : null}
       </div>
+      </div>
+
+      {product.id ? <ProductReviews productId={product.id} /> : null}
     </div>
   )
 }

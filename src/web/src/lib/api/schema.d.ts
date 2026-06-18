@@ -161,6 +161,17 @@ export interface paths {
                         "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put?: never;
@@ -640,6 +651,17 @@ export interface paths {
                         "text/json": components["schemas"]["ProblemDetails"];
                     };
                 };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
             };
         };
         put?: never;
@@ -698,6 +720,17 @@ export interface paths {
                 };
                 /** @description Forbidden */
                 403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2481,6 +2514,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{productId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number;
+                    PageSize?: number;
+                };
+                header?: never;
+                path: {
+                    productId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewListDtoApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    productId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SubmitReviewRequest"];
+                    "text/json": components["schemas"]["SubmitReviewRequest"];
+                    "application/*+json": components["schemas"]["SubmitReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3078,6 +3223,61 @@ export interface components {
         ReorderProductImagesRequest: {
             imageIds?: string[] | null;
         };
+        ReviewDto: {
+            /** Format: uuid */
+            id?: string;
+            customerName?: string | null;
+            /** Format: int32 */
+            rating?: number;
+            body?: string | null;
+            /** Format: double */
+            sentimentScore?: number | null;
+            sentimentLabel?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        ReviewDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ReviewDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        ReviewDtoPagedResult: {
+            items?: components["schemas"]["ReviewDto"][] | null;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            readonly totalPages?: number;
+            readonly hasNext?: boolean;
+            readonly hasPrevious?: boolean;
+        };
+        ReviewListDto: {
+            page?: components["schemas"]["ReviewDtoPagedResult"];
+            summary?: components["schemas"]["ReviewSummaryDto"];
+        };
+        ReviewListDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ReviewListDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        ReviewSummaryDto: {
+            /** Format: double */
+            average?: number;
+            /** Format: int32 */
+            count?: number;
+            distribution?: number[] | null;
+        };
         SalesReportDto: {
             days?: components["schemas"]["DailySalesDto"][] | null;
             categories?: components["schemas"]["CategorySalesDto"][] | null;
@@ -3121,6 +3321,11 @@ export interface components {
             traceId?: string | null;
             /** Format: date-time */
             timestamp?: string;
+        };
+        SubmitReviewRequest: {
+            /** Format: int32 */
+            rating?: number;
+            body?: string | null;
         };
         UpdateCartItemRequest: {
             /** Format: int32 */
