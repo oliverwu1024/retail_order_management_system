@@ -55,6 +55,9 @@ public class Product : IAuditableEntity
     /// <summary>The product's image gallery (general + variant-specific). See <see cref="ProductImage"/>.</summary>
     public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 
+    /// <summary>Customer reviews of this product (Phase 4). See <see cref="Review"/>.</summary>
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+
     /// <summary>Soft-delete flag — hidden by the global query filter when true.</summary>
     public bool IsDeleted { get; set; }
 

@@ -133,3 +133,27 @@ public enum ShipmentStatus : byte
     /// <summary>Confirmed delivered — <c>DeliveredAt</c> stamped.</summary>
     Delivered = 3,
 }
+
+/// <summary>
+/// Overall sentiment classification of a <c>Review</c> (Phase 4), produced by
+/// Azure AI Language. Unlike the lifecycle enums above this is a CLASSIFICATION,
+/// not a state machine: it has no "starting" value and no DB default — a review is
+/// NULL (unscored) until the background scorer writes a label. The four members are
+/// Azure AI Language's exact document-level sentiment vocabulary, so the mapping
+/// from its response is 1:1. Byte-backed → <c>tinyint</c>, explicit 1-based values
+/// (stored + serialized contract — never renumber). See DATABASE_DESIGN §3.15.
+/// </summary>
+public enum SentimentLabel : byte
+{
+    /// <summary>Predominantly positive.</summary>
+    Positive = 1,
+
+    /// <summary>Neither clearly positive nor negative.</summary>
+    Neutral = 2,
+
+    /// <summary>Predominantly negative.</summary>
+    Negative = 3,
+
+    /// <summary>Contains both positive and negative sentiment.</summary>
+    Mixed = 4,
+}

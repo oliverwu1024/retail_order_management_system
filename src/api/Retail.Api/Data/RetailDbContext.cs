@@ -116,6 +116,10 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Immutable audit trail of admin mutations (Phase 3).</summary>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    // ── Reviews & sentiment (Phase 4) ────────────────────────────────────────
+    /// <summary>Customer product reviews (member-only). Soft-deletable; sentiment scored asynchronously.</summary>
+    public DbSet<Review> Reviews => Set<Review>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.
@@ -154,10 +158,11 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
 
         // 3. Soft-delete global query filters (Task 1.2.9). Rows with IsDeleted=true
         //    become invisible to every ordinary query; the admin "show deleted" view
-        //    opts back in with IgnoreQueryFilters(). Only Product + Category are
+        //    opts back in with IgnoreQueryFilters(). Product + Category + Review are
         //    soft-deletable (DATABASE_DESIGN §1).
         builder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
         builder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
+        builder.Entity<Review>().HasQueryFilter(r => !r.IsDeleted);
 
         // 4. Order-number sequence (Phase 2). Seq_OrderNumber yields human-facing order
         //    numbers starting at 10001; Order.OrderNumber defaults to NEXT VALUE FOR it
