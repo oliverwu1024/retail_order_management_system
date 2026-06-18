@@ -1,5 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Retail.Api.Common.Constants;
+using Retail.Api.Domain.Entities;
+using Retail.Api.Identity;
 
 namespace Retail.Tests.Integration.Controllers;
 
@@ -32,6 +36,34 @@ public class AdminAccessControlTests
     {
         (HttpClient customer, _) = await CustomerClientAsync();
         HttpResponseMessage resp = await customer.GetAsync("/api/v1/admin/users");
+        Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminUsers_ForgedCustomerJwt_Returns403()
+    {
+        // Task 3.4.3: a VALIDLY-SIGNED bearer carrying only the Customer role must be rejected by
+        // AUTHORIZATION (403), not merely authentication — the admin policies gate on role, not just
+        // on a good signature. Minted directly via IJwtService (no login flow), so it's a genuinely
+        // forged token rather than a real session cookie.
+        string token;
+        using (IServiceScope scope = _factory.Services.CreateScope())
+        {
+            IJwtService jwt = scope.ServiceProvider.GetRequiredService<IJwtService>();
+            var customer = new ApplicationUser
+            {
+                Id = Guid.NewGuid().ToString(),
+                Email = "forged@test.local",
+                DisplayName = "Forged Customer",
+            };
+            (token, _) = jwt.CreateAccessToken(customer, new[] { Roles.Customer });
+        }
+
+        HttpClient client = _factory.CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/admin/users");
+        request.Headers.Add("Cookie", $"{AuthConstants.AccessTokenCookie}={token}");
+        HttpResponseMessage resp = await client.SendAsync(request);
+
         Assert.Equal(HttpStatusCode.Forbidden, resp.StatusCode);
     }
 

@@ -113,6 +113,26 @@ public class AdminOrderFlowTests
     }
 
     [Fact]
+    public async Task Ship_ConcurrentRequests_OneShipsOneConflicts()
+    {
+        // Two staff mark the same Paid order shipped at once: the Order.RowVersion + status guard lets
+        // exactly one through (200) and the loser gets 409 (review L16 — concurrency on an admin transition).
+        string email = $"guest-{Guid.NewGuid():N}@test.local";
+        (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Paid, email, withCharge: true);
+        (HttpClient s1, string csrf1) = await StaffClientAsync();
+        (HttpClient s2, string csrf2) = await StaffClientAsync();
+
+        var body = new { carrier = "AusPost", trackingNumber = "TRK-RACE" };
+        HttpResponseMessage[] results = await Task.WhenAll(
+            PostJsonAsync(s1, $"/api/v1/admin/orders/{orderId}/ship", body, csrf1),
+            PostJsonAsync(s2, $"/api/v1/admin/orders/{orderId}/ship", body, csrf2));
+
+        List<HttpStatusCode> codes = results.Select(r => r.StatusCode).ToList();
+        Assert.Contains(HttpStatusCode.OK, codes);
+        Assert.Contains(HttpStatusCode.Conflict, codes);
+    }
+
+    [Fact]
     public async Task MarkShipped_NonPaidOrder_Returns409()
     {
         (Guid orderId, _) = await SeedOrderAsync(OrderStatus.Pending, $"g-{Guid.NewGuid():N}@test.local");
