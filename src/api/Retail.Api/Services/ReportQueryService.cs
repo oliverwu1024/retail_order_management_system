@@ -16,11 +16,17 @@ public sealed class ReportQueryService : IReportQueryService
 {
     private static readonly OrderStatus[] PaidStatuses = { OrderStatus.Paid, OrderStatus.Fulfilled };
 
-    private readonly RetailDbContext _db;
+    // Bound the sentiment summary's in-memory load to a recent window (the dashboard reflects current
+    // sentiment); a SQL GROUP BY is the Phase-10 optimisation if review volume ever outgrows this.
+    private const int SentimentWindowDays = 365;
 
-    public ReportQueryService(RetailDbContext db)
+    private readonly RetailDbContext _db;
+    private readonly TimeProvider _timeProvider;
+
+    public ReportQueryService(RetailDbContext db, TimeProvider timeProvider)
     {
         _db = db;
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -58,9 +64,11 @@ public sealed class ReportQueryService : IReportQueryService
     /// <inheritdoc />
     public async Task<SentimentSummaryDto> GetSentimentSummaryAsync(CancellationToken ct)
     {
-        // Only scored reviews (ProcessedAt + SentimentScore set). In-memory aggregation, like sales-by-day.
+        // Scored reviews in the recent window. In-memory aggregation, like sales-by-day; the window
+        // bounds the load (a SQL GROUP BY is the Phase-10 optimisation).
+        DateTimeOffset cutoff = _timeProvider.GetUtcNow().AddDays(-SentimentWindowDays);
         List<Review> scored = await _db.Reviews.AsNoTracking()
-            .Where(r => r.ProcessedAt != null && r.SentimentScore != null)
+            .Where(r => r.CreatedAt >= cutoff && r.ProcessedAt != null && r.SentimentScore != null)
             .Include(r => r.Product)
             .ToListAsync(ct);
 

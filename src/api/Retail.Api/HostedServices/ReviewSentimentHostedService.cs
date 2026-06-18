@@ -79,7 +79,7 @@ public sealed class ReviewSentimentHostedService : BackgroundService
                         _logger.LogInformation("Re-queued {Count} unscored review(s) for sentiment scoring.", pending.Count);
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogError(ex, "Sentiment re-scan failed; will retry next interval.");
                 }

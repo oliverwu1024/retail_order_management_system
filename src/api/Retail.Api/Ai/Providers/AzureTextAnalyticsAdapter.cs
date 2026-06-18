@@ -36,6 +36,11 @@ public sealed class AzureTextAnalyticsAdapter : ITextAnalyticsAdapter
         {
             throw new ExternalServiceException("Azure AI Language is not configured.");
         }
+        if (!_options.Endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            // Refuse to send the subscription key over a non-TLS endpoint (the endpoint is operator-supplied).
+            throw new ExternalServiceException("Azure AI Language endpoint must use HTTPS.");
+        }
 
         var body = new
         {
@@ -69,12 +74,25 @@ public sealed class AzureTextAnalyticsAdapter : ITextAnalyticsAdapter
 
     private static SentimentResult Map(JsonElement root)
     {
-        JsonElement document = root.GetProperty("results").GetProperty("documents")[0];
-        string sentiment = document.GetProperty("sentiment").GetString() ?? "neutral";
+        // A 2xx with no document (or an unexpected shape) becomes a 503, not an uncaught exception.
+        if (!root.TryGetProperty("results", out JsonElement results)
+            || !results.TryGetProperty("documents", out JsonElement documents)
+            || documents.ValueKind != JsonValueKind.Array
+            || documents.GetArrayLength() == 0)
+        {
+            throw new ExternalServiceException("Azure AI Language returned no sentiment result.");
+        }
 
-        JsonElement scores = document.GetProperty("confidenceScores");
-        decimal positive = scores.GetProperty("positive").GetDecimal();
-        decimal negative = scores.GetProperty("negative").GetDecimal();
+        JsonElement document = documents[0];
+        string sentiment = document.TryGetProperty("sentiment", out JsonElement s) ? s.GetString() ?? "neutral" : "neutral";
+
+        decimal positive = 0m;
+        decimal negative = 0m;
+        if (document.TryGetProperty("confidenceScores", out JsonElement scores))
+        {
+            positive = scores.TryGetProperty("positive", out JsonElement p) ? p.GetDecimal() : 0m;
+            negative = scores.TryGetProperty("negative", out JsonElement n) ? n.GetDecimal() : 0m;
+        }
         decimal score = Math.Round(positive - negative, 3);
 
         SentimentLabel label = sentiment switch
