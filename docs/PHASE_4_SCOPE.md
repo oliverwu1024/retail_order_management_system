@@ -257,7 +257,7 @@ name an LLM or CopyGen — PLAN §7/§15 classify the AI features as "recruiter
 hooks, not on either bullet," and the saved **"no LLM API claim"** rule means
 CopyGen is portfolio/learning only and must not be over-invested. Where Phase 4
 *does* reinforce bullets:
-- **Azure / platform (Job A-1):** the **Azure AI Language** integration via `ITextAnalyticsAdapter` + `AzureTextAnalyticsClient` is a clean *managed-ML service-call* artifact that survives interview drill-down precisely because it is **not** a model-training claim — the better résumé-bearing AI piece than CopyGen.
+- **Azure / platform (Job A-1):** the **Azure AI Language** integration via `ITextAnalyticsAdapter` + `AzureTextAnalyticsAdapter` is a clean *managed-ML service-call* artifact that survives interview drill-down precisely because it is **not** a model-training claim — the better résumé-bearing AI piece than CopyGen.
 - **Backend / REST + EF (Job A-2 / B-3):** the `Review` entity + repository (paged `AsNoTracking` + filtered unique index) + the new `/reviews` + `/generate-copy` + `/analytics/sentiment-*` endpoints add to the REST/EF/pagination surface, all OpenAPI-documented.
 - **Async / event-driven (Job A-3 precursor):** `ReviewSentimentHostedService` consuming a `Channel<Guid>` fed by `ReviewCreated` is the in-process precursor migrated to Service Bus + Functions in Phase 8 (where A-3's "10K+ events/day, 70% sync reduction" is actually measured).
 - **Testing / CI (Job A-4 / B-4):** the new integration + `Mock<ILlmClient>` unit tests feed the "85% coverage / 100+ tests / xUnit + Moq / CI on every PR" numbers.
@@ -273,7 +273,7 @@ and the first thing to cut** if the two-week phase is at risk.
 - **OpenAI provider** (`OpenAiLlmClient`) — Phase 6/7 stretch (ADR-0005); the interface lands now so it's a ~1-day add later.
 - **Distributed sentiment queue** (Service Bus / leader election; multi-instance double-scoring & restart durability) — Phase 8. The in-process `Channel<Guid>` + slow re-scan is the single-instance answer for now (§18).
 - **Chatbot + forecasting + anomaly** (the other AI features) — Phase 5, reusing the `ILlmClient` seam.
-- **One-line `DATABASE_DESIGN.md` correction** (Review migration is `0009`, not `0004`) at the next docs pass.
+- ~~**One-line `DATABASE_DESIGN.md` correction** (Review migration is `0009`, not `0004`)~~ — ✅ done in C4 (DATABASE_DESIGN §5 row 4 now reads `0009`).
 - **Review moderation / editing / helpful-votes** — out of scope; revisit only if a bullet needs it.
 
 ## 18. Known limitations (in-process phase)
@@ -281,3 +281,14 @@ and the first thing to cut** if the two-week phase is at risk.
 - **Restart durability:** the `Channel<Guid>` is in-process; a crash between enqueue and scoring loses the signal. **Mitigation in scope:** the slow `ProcessedAt IS NULL` re-scan re-picks stranded reviews (§3.5). The durable fix is Service Bus (Phase 8).
 - **Multi-instance:** like `CartExpirySweeper`, the hosted service runs on every instance with no leader election; with an in-process channel each instance only scores what it enqueued, and the slow scan can double-attempt across instances. Acceptable at portfolio scale (scoring is idempotent on `ProcessedAt`); the real fix is the Phase-8 queue.
 - **Azure F0 limits:** 5k tx/month + rate limits; a burst or retry storm can 429. **Mitigation:** per-review try/catch, throttle → `ExternalServiceException`, leave `ProcessedAt = null` for the slow retry, small batch cap.
+
+## 19. As-built reconciliation (C0–C4)
+
+Phase 4 shipped C0–C4 (all on `main`, CI green). Deltas from this scope's pre-build plan, recorded here rather than silently absorbed:
+
+- **Live providers = typed `HttpClient` on the documented REST APIs, not the SDKs (user decision).** `AnthropicLlmClient` calls the Anthropic Messages API (`POST /v1/messages`) and `AzureTextAnalyticsAdapter` calls the Azure AI Language REST API (`:analyze-text`), each as a typed `HttpClient` + `AddStandardResilienceHandler()` (Polly), mapping our contracts to/from the wire JSON. This **reconciles ADR-0005** (which named the community `Anthropic.SDK` NuGet): a stable wire contract with no SDK-version coupling, exactly the `IHttpClientFactory` + resilience wiring CODING_STANDARDS describes — so the ADR's `using Anthropic.SDK` compile-guard is moot (there is no SDK namespace to fence). Recorded in each provider's XML-doc.
+- **Hermetic test default = the stubs, not separate `Fake*` registrations.** `StubLlmClient` / `StubTextAnalyticsAdapter` are the `Ai:Mode=stub` default, so the integration tests run against them with no `ConfigureTestServices` override needed. The §16 reference to **`Mock<ILlmClient>`** is as-built **hand-rolled fakes** + the stubs — the unit-test project has no Moq, matching the project's `FakeStripe*` convention.
+- **Sentiment trigger = direct enqueue to a singleton `Channel<Guid>`** (`ReviewService` → `ReviewSentimentQueue`), not a domain-event dispatcher — honouring ADR-0002 (no MediatR). Fast drain + slow `ProcessedAt IS NULL` re-scan in one `BackgroundService`; tracked-load write-back; idempotent.
+- **Dashboard RBAC = new `Sentiment.View` policy ({StoreManager, Administrator})**; migration physical file **`0009_reviews_sentiment`**; the rating-distribution + sentiment-label visualisations use compact bars/colour-coded chips (not Recharts) — the right primitive for those small categorical breakdowns.
+- **Dev demo seed:** a Development-only `ReviewDemoSeeder` (idempotent, no-op outside Development) seeds varied-sentiment reviews so the storefront + dashboard show data on first run.
+- **CI note:** the `src/web` job enforces Prettier via a separate `format:check` gate beyond ESLint — `pnpm format` is now part of the web verify step (C1/C2 first failed CI on it; fixed in `f24d0e5`).

@@ -592,7 +592,7 @@ Per-phase migrations:
 | 1 | `0001_catalog` | Category, Product, ProductVariant, InventoryItem, Address, CustomerProfile, Seq_OrderNumber, **RefreshToken** (HTTP-only cookie auth) |
 | 2 | `0002_orders` | Cart, CartItem, InventoryReservation, Order, OrderLine, Payment, ProcessedStripeEvent, Shipment |
 | 3 | `0003_audit` | AuditLog table + supporting indexes |
-| 4 | `0004_reviews_sentiment` | Review table (+ sentiment columns), product sentiment index |
+| 4 | `0009_reviews_sentiment` | Review table (Rating, Body, SentimentScore, SentimentLabel, ProcessedAt, IsDeleted) + `IX_Review_ProductId_CreatedAt` + filtered-unique `UX_Review_ProductId_CustomerProfileId`. **As-built the physical file is `<ts>_0009_reviews_sentiment`** — this column is the design-table label; the on-disk migration sequence is monotonic, and `0004` is already `0004_orders`. |
 | 5 | `0005_chat_forecast_anomaly` | ChatSession, ChatMessage, DemandForecast, ReorderHint, OrderAnomaly |
 | 7 | `0006a_order_breakdown` | OrderPriceBreakdown (1:1 Order) |
 | 7 | `0006b_vouchers` | Voucher, VoucherRedemption |
