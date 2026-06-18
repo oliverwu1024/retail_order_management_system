@@ -37,3 +37,6 @@ export type AdminOrderPage = Schemas['AdminOrderSummaryDtoPagedResult']
 export type AuditLog = Schemas['AuditLogDto']
 export type AuditLogPage = Schemas['AuditLogDtoPagedResult']
 export type SalesReport = Schemas['SalesReportDto']
+
+export type SentimentSummary = Schemas['SentimentSummaryDto']
+export type ProductSentiment = Schemas['ProductSentimentDto']

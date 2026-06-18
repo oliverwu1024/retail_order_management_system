@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ROLE_SETS, hasAnyRole } from '@/lib/auth/roleSets'
 import { useAuthStore } from '@/lib/store/auth-store'
+import { SentimentSection } from './components/SentimentSection'
 
 /**
  * Admin dashboard — the /admin index, rendered inside <AdminShell />. Cards are gated by role (via
@@ -12,6 +13,7 @@ import { useAuthStore } from '@/lib/store/auth-store'
 export function AdminHomePage() {
   const roles = useAuthStore((state) => state.user?.roles)
   const canManageCatalog = hasAnyRole(roles, ROLE_SETS.catalog)
+  const canViewSentiment = hasAnyRole(roles, ROLE_SETS.sentiment)
 
   return (
     <section className="space-y-6">
@@ -35,6 +37,8 @@ export function AdminHomePage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {canViewSentiment ? <SentimentSection /> : null}
     </section>
   )
 }

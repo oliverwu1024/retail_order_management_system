@@ -672,6 +672,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/sentiment-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["SentimentSummaryDtoApiResponse"];
+                        "application/json": components["schemas"]["SentimentSummaryDtoApiResponse"];
+                        "text/json": components["schemas"]["SentimentSummaryDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/products-needing-attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProductSentimentDtoIReadOnlyListApiResponse"];
+                        "application/json": components["schemas"]["ProductSentimentDtoIReadOnlyListApiResponse"];
+                        "text/json": components["schemas"]["ProductSentimentDtoIReadOnlyListApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["ProblemDetails"];
+                        "application/json": components["schemas"]["ProblemDetails"];
+                        "text/json": components["schemas"]["ProblemDetails"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -3086,6 +3204,11 @@ export interface components {
             /** Format: date-time */
             timestamp?: string;
         };
+        LabelCountDto: {
+            label?: string | null;
+            /** Format: int32 */
+            count?: number;
+        };
         LoginRequest: {
             email?: string | null;
             password?: string | null;
@@ -3233,6 +3356,24 @@ export interface components {
             /** Format: uuid */
             productVariantId?: string | null;
         };
+        ProductSentimentDto: {
+            /** Format: uuid */
+            productId?: string;
+            productName?: string | null;
+            /** Format: double */
+            averageScore?: number;
+            /** Format: int32 */
+            reviewCount?: number;
+        };
+        ProductSentimentDtoIReadOnlyListApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ProductSentimentDto"][] | null;
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
         ProductSummaryDto: {
             /** Format: uuid */
             id?: string;
@@ -3364,6 +3505,23 @@ export interface components {
         SalesReportDtoApiResponse: {
             success?: boolean;
             data?: components["schemas"]["SalesReportDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        SentimentSummaryDto: {
+            /** Format: double */
+            averageScore?: number | null;
+            /** Format: int32 */
+            scoredReviews?: number;
+            labelDistribution?: components["schemas"]["LabelCountDto"][] | null;
+            products?: components["schemas"]["ProductSentimentDto"][] | null;
+        };
+        SentimentSummaryDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["SentimentSummaryDto"];
             message?: string | null;
             errors?: components["schemas"]["ApiError"][] | null;
             traceId?: string | null;

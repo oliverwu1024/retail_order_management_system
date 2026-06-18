@@ -14,6 +14,8 @@ export const ROLE_SETS = {
   reports: ['Staff', 'StoreManager', 'Administrator'],
   users: ['StoreManager', 'Administrator'],
   catalog: ['Administrator'],
+  // Review-sentiment dashboard — StoreManager + Administrator (Staff excluded), mirrors Sentiment.View.
+  sentiment: ['StoreManager', 'Administrator'],
   // Capability (not a sidebar area): who may issue a refund — mirrors Orders.Refund.
   refund: ['StoreManager', 'Administrator'],
 } satisfies Record<string, string[]>
