@@ -64,73 +64,77 @@ export function ProductDetailPage() {
     <div className="space-y-12">
       <div className="grid gap-8 md:grid-cols-2">
         {/* Keyed by the selected variant so the gallery resets to that variant's first image. */}
-      <ProductGallery
-        key={selected?.id ?? 'base'}
-        images={product.images ?? []}
-        variantId={selected?.id}
-        fallbackBlobKey={product.primaryImageBlobKey}
-        alt={product.name ?? 'Product'}
-      />
+        <ProductGallery
+          key={selected?.id ?? 'base'}
+          images={product.images ?? []}
+          variantId={selected?.id}
+          fallbackBlobKey={product.primaryImageBlobKey}
+          alt={product.name ?? 'Product'}
+        />
 
-      <div className="space-y-4">
-        {product.brandName ? (
-          <p className="text-sm uppercase tracking-wide text-muted-foreground">
-            {product.brandName}
-          </p>
-        ) : null}
-        <h1 className="text-3xl font-semibold">{product.name}</h1>
+        <div className="space-y-4">
+          {product.brandName ? (
+            <p className="text-sm uppercase tracking-wide text-muted-foreground">
+              {product.brandName}
+            </p>
+          ) : null}
+          <h1 className="text-3xl font-semibold">{product.name}</h1>
 
-        {selected ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-2xl font-semibold">{formatCents(selected.priceCents ?? 0)}</span>
-            {selected.compareAtPriceCents != null &&
-            selected.compareAtPriceCents > (selected.priceCents ?? 0) ? (
-              <span className="text-muted-foreground line-through">
-                {formatCents(selected.compareAtPriceCents)}
+          {selected ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-2xl font-semibold">
+                {formatCents(selected.priceCents ?? 0)}
               </span>
-            ) : null}
-            <StockBadge status={selected.stockStatus ?? 'OutOfStock'} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No variants available.</p>
-        )}
+              {selected.compareAtPriceCents != null &&
+              selected.compareAtPriceCents > (selected.priceCents ?? 0) ? (
+                <span className="text-muted-foreground line-through">
+                  {formatCents(selected.compareAtPriceCents)}
+                </span>
+              ) : null}
+              <StockBadge status={selected.stockStatus ?? 'OutOfStock'} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No variants available.</p>
+          )}
 
-        {variants.length > 0 ? (
-          <div className="space-y-1">
-            <span className="text-sm font-medium">Variant</span>
-            <VariantSelector
-              variants={variants}
-              selectedId={selected?.id ?? ''}
-              onSelect={setSelectedVariantId}
-            />
-          </div>
-        ) : null}
+          {variants.length > 0 ? (
+            <div className="space-y-1">
+              <span className="text-sm font-medium">Variant</span>
+              <VariantSelector
+                variants={variants}
+                selectedId={selected?.id ?? ''}
+                onSelect={setSelectedVariantId}
+              />
+            </div>
+          ) : null}
 
-        {selected ? (
-          <div className="flex items-center gap-3 pt-2">
-            <Select
-              aria-label="Quantity"
-              className="w-20"
-              value={quantity}
-              disabled={!canAddToCart || addToCart.isPending}
-              onChange={(event) => setQuantity(Number(event.target.value))}
-            >
-              {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </Select>
-            <Button disabled={!canAddToCart || addToCart.isPending} onClick={onAddToCart}>
-              {addToCart.isPending ? 'Adding…' : 'Add to cart'}
-            </Button>
-          </div>
-        ) : null}
+          {selected ? (
+            <div className="flex items-center gap-3 pt-2">
+              <Select
+                aria-label="Quantity"
+                className="w-20"
+                value={quantity}
+                disabled={!canAddToCart || addToCart.isPending}
+                onChange={(event) => setQuantity(Number(event.target.value))}
+              >
+                {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </Select>
+              <Button disabled={!canAddToCart || addToCart.isPending} onClick={onAddToCart}>
+                {addToCart.isPending ? 'Adding…' : 'Add to cart'}
+              </Button>
+            </div>
+          ) : null}
 
-        {product.description ? (
-          <p className="whitespace-pre-line text-sm text-muted-foreground">{product.description}</p>
-        ) : null}
-      </div>
+          {product.description ? (
+            <p className="whitespace-pre-line text-sm text-muted-foreground">
+              {product.description}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {product.id ? <ProductReviews productId={product.id} /> : null}

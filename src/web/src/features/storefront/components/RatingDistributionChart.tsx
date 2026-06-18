@@ -12,7 +12,11 @@ export function RatingDistributionChart({ summary }: { summary: ReviewSummary })
   const max = Math.max(1, ...distribution) // avoid divide-by-zero on an all-empty product
 
   if (count === 0) {
-    return <p className="text-sm text-muted-foreground">No reviews yet — be the first to review this product.</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        No reviews yet — be the first to review this product.
+      </p>
+    )
   }
 
   return (

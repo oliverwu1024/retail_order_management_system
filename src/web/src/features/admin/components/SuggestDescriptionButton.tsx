@@ -71,7 +71,11 @@ export function SuggestDescriptionButton({ productId, onApply }: SuggestDescript
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <span className="text-sm font-medium">Tone</span>
-              <Select aria-label="Tone" value={tone} onChange={(event) => setTone(event.target.value)}>
+              <Select
+                aria-label="Tone"
+                value={tone}
+                onChange={(event) => setTone(event.target.value)}
+              >
                 <option value="professional">Professional</option>
                 <option value="playful">Playful</option>
                 <option value="luxury">Luxury</option>
@@ -79,7 +83,11 @@ export function SuggestDescriptionButton({ productId, onApply }: SuggestDescript
             </div>
             <div className="space-y-1">
               <span className="text-sm font-medium">Length</span>
-              <Select aria-label="Length" value={length} onChange={(event) => setLength(event.target.value)}>
+              <Select
+                aria-label="Length"
+                value={length}
+                onChange={(event) => setLength(event.target.value)}
+              >
                 <option value="short">Short</option>
                 <option value="medium">Medium</option>
                 <option value="long">Long</option>
@@ -108,7 +116,13 @@ export function SuggestDescriptionButton({ productId, onApply }: SuggestDescript
           <div className="flex justify-end gap-2">
             {result ? (
               <>
-                <Button type="button" variant="outline" size="sm" onClick={generate} disabled={copyGen.isPending}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generate}
+                  disabled={copyGen.isPending}
+                >
                   {copyGen.isPending ? 'Regenerating…' : 'Regenerate'}
                 </Button>
                 <Button type="button" size="sm" onClick={apply}>

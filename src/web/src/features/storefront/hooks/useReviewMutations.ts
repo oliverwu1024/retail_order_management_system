@@ -24,15 +24,21 @@ export function useSubmitReview(productId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (input: SubmitReviewInput): Promise<Review> => {
-      const { data, error, response } = await apiClient.POST('/api/v1/products/{productId}/reviews', {
-        params: { path: { productId } },
-        body: { rating: input.rating, body: input.body },
-      })
+      const { data, error, response } = await apiClient.POST(
+        '/api/v1/products/{productId}/reviews',
+        {
+          params: { path: { productId } },
+          body: { rating: input.rating, body: input.body },
+        },
+      )
       if (error || !data?.data) {
         // The API returns a friendly message in the failure envelope (e.g. "You can only review a
         // product you have purchased."); surface it, falling back to a generic line.
         const serverMessage = (error as { message?: string } | undefined)?.message
-        throw new ReviewSubmitError(serverMessage ?? 'Could not submit your review.', response?.status)
+        throw new ReviewSubmitError(
+          serverMessage ?? 'Could not submit your review.',
+          response?.status,
+        )
       }
       return data.data
     },

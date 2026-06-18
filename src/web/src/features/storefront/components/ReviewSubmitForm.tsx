@@ -10,7 +10,11 @@ import { useSubmitReview } from '../hooks/useReviewMutations'
 // Mirrors the server-side SubmitReviewRequestValidator (rating 1..5, body 1..4000).
 const reviewSchema = z.object({
   rating: z.number().int().min(1, 'Please choose a rating.').max(5),
-  body: z.string().trim().min(1, 'Please write a few words.').max(4000, 'Reviews are limited to 4000 characters.'),
+  body: z
+    .string()
+    .trim()
+    .min(1, 'Please write a few words.')
+    .max(4000, 'Reviews are limited to 4000 characters.'),
 })
 
 type ReviewFormValues = z.infer<typeof reviewSchema>
@@ -52,7 +56,12 @@ export function ReviewSubmitForm({ productId }: { productId: string }) {
           control={control}
           name="rating"
           render={({ field }) => (
-            <RatingStars value={field.value} onChange={field.onChange} name="rating" label="Your rating" />
+            <RatingStars
+              value={field.value}
+              onChange={field.onChange}
+              name="rating"
+              label="Your rating"
+            />
           )}
         />
         {errors.rating ? <p className="text-xs text-destructive">{errors.rating.message}</p> : null}

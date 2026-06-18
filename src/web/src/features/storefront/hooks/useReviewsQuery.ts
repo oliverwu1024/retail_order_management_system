@@ -17,7 +17,10 @@ export function useReviewsQuery(productId: string | undefined, page: number, pag
     queryFn: async (): Promise<ReviewList> => {
       const { data, error } = await apiClient.GET('/api/v1/products/{productId}/reviews', {
         // PascalCase to match the ReviewListQuery DTO (consistent with the rest of the API).
-        params: { path: { productId: productId as string }, query: { Page: page, PageSize: pageSize } },
+        params: {
+          path: { productId: productId as string },
+          query: { Page: page, PageSize: pageSize },
+        },
       })
       if (error || !data?.data) {
         throw new Error('Failed to load reviews.')

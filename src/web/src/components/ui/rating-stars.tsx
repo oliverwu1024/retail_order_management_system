@@ -60,7 +60,10 @@ export function RatingStars({
           <Star
             key={star}
             filled={star <= rounded}
-            className={cn(starSize, star <= rounded ? 'text-amber-400' : 'text-muted-foreground/30')}
+            className={cn(
+              starSize,
+              star <= rounded ? 'text-amber-400' : 'text-muted-foreground/30',
+            )}
           />
         ))}
       </span>
@@ -69,7 +72,11 @@ export function RatingStars({
 
   // ── Interactive (native radios for built-in a11y + keyboard) ──────────────
   return (
-    <div role="radiogroup" aria-label={label} className={cn('inline-flex items-center gap-1', className)}>
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn('inline-flex items-center gap-1', className)}
+    >
       {stars.map((star) => (
         <label
           key={star}
