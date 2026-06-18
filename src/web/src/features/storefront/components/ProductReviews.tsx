@@ -34,6 +34,11 @@ export function ProductReviews({ productId }: { productId: string }) {
 
           {isCustomer ? (
             <ReviewSubmitForm productId={productId} />
+          ) : user ? (
+            <p className="text-sm text-muted-foreground">
+              Reviews come from customer accounts — you’re signed in to a back-office account, which
+              can’t post customer reviews.
+            </p>
           ) : (
             <p className="text-sm text-muted-foreground">
               <Link to="/login" className="font-medium underline">
