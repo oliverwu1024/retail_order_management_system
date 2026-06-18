@@ -1560,6 +1560,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/products/{id}/generate-copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SuggestDescriptionRequest"];
+                    "text/json": components["schemas"]["SuggestDescriptionRequest"];
+                    "application/*+json": components["schemas"]["SuggestDescriptionRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SuggestProductCopyResponseApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Service Unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/products/{id}/images": {
         parameters: {
             query?: never;
@@ -3326,6 +3405,25 @@ export interface components {
             /** Format: int32 */
             rating?: number;
             body?: string | null;
+        };
+        SuggestDescriptionRequest: {
+            tone?: string | null;
+            length?: string | null;
+        };
+        SuggestProductCopyResponse: {
+            description?: string | null;
+            seoTitle?: string | null;
+            seoMetaDescription?: string | null;
+            bulletPoints?: string[] | null;
+        };
+        SuggestProductCopyResponseApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["SuggestProductCopyResponse"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
         };
         UpdateCartItemRequest: {
             /** Format: int32 */

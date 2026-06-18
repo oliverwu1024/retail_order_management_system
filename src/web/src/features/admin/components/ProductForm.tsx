@@ -6,12 +6,15 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import type { Category } from '@/lib/api/types'
 import { productFormSchema, type ProductFormValues } from '../lib/product-schema'
+import { SuggestDescriptionButton } from './SuggestDescriptionButton'
 
 interface ProductFormProps {
   mode: 'create' | 'edit'
   categories: Category[]
   defaultValues: ProductFormValues
   isSubmitting: boolean
+  /** Existing product id (edit mode) — enables AI "Suggest with AI" copy generation. */
+  productId?: string
   /** Called with validated values; the page maps them to the right request body. */
   onSubmit: (values: ProductFormValues) => void
 }
@@ -35,11 +38,13 @@ export function ProductForm({
   categories,
   defaultValues,
   isSubmitting,
+  productId,
   onSubmit,
 }: ProductFormProps) {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -101,9 +106,21 @@ export function ProductForm({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="description" className="text-sm font-medium">
-          Description
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="description" className="text-sm font-medium">
+            Description
+          </label>
+          {productId ? (
+            <SuggestDescriptionButton
+              productId={productId}
+              onApply={(copy) => {
+                setValue('description', copy.description ?? '', { shouldDirty: true })
+                setValue('seoTitle', copy.seoTitle ?? '', { shouldDirty: true })
+                setValue('seoDescription', copy.seoMetaDescription ?? '', { shouldDirty: true })
+              }}
+            />
+          ) : null}
+        </div>
         <Textarea id="description" rows={4} {...register('description')} />
         <FieldError message={errors.description?.message} />
       </div>

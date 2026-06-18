@@ -124,6 +124,7 @@ export function ProductFormPage() {
             key={productQuery.data?.id ?? 'new'}
             defaultValues={productQuery.data ? toFormValues(productQuery.data) : emptyProduct}
             isSubmitting={isSubmitting}
+            productId={mode === 'edit' ? id : undefined}
             onSubmit={onSubmit}
           />
 
