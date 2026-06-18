@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Retail.Api.Ai;
 using Retail.Api.Common.Enums;
 using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
+using Retail.Api.Exceptions;
 using Retail.Api.Services;
 
 namespace Retail.Tests.Integration.Controllers;
@@ -65,6 +67,30 @@ public class ReviewSentimentServiceTests
 
         IReadOnlyList<Guid> after = await sentiment.GetUnscoredIdsAsync(10_000, CancellationToken.None);
         Assert.DoesNotContain(reviewId, after);
+    }
+
+    [Fact]
+    public async Task ScoreAsync_AdapterFailure_LeavesReviewUnscored()
+    {
+        Guid reviewId = await SeedReviewAsync("Anything at all.");
+
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        // A throwing adapter stands in for an Azure outage: the failure must propagate (the hosted
+        // service catches it) and leave the review unscored so the slow re-scan retries it.
+        var service = new ReviewSentimentService(db, new ThrowingAdapter(), TimeProvider.System);
+
+        await Assert.ThrowsAsync<ExternalServiceException>(() => service.ScoreAsync(reviewId, CancellationToken.None));
+
+        Review review = await ReloadAsync(reviewId);
+        Assert.Null(review.ProcessedAt);
+        Assert.Null(review.SentimentScore);
+    }
+
+    private sealed class ThrowingAdapter : ITextAnalyticsAdapter
+    {
+        public Task<SentimentResult> AnalyzeAsync(string text, CancellationToken ct) =>
+            throw new ExternalServiceException("simulated AI outage");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────

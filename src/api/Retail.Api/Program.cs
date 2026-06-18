@@ -25,6 +25,7 @@ using Retail.Api.Identity;
 using Retail.Api.Middlewares;
 using Retail.Api.Payments;
 using Retail.Api.Repositories;
+using Retail.Api.Seeding;
 using Retail.Api.Services;
 using Retail.Api.Storage;
 using Serilog;
@@ -284,6 +285,7 @@ try
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IdentityDataSeeder>();
+    builder.Services.AddScoped<ReviewDemoSeeder>();
 
     // ── Catalog services (Story 1.2) ─────────────────────────────────────────
     builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -642,6 +644,8 @@ try
         {
             IdentityDataSeeder seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
             await seeder.SeedAsync();
+            // Development-only demo reviews (idempotent, no-op outside Development).
+            await scope.ServiceProvider.GetRequiredService<ReviewDemoSeeder>().SeedAsync();
         }
         catch (Exception seedException)
         {
