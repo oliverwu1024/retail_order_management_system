@@ -85,6 +85,13 @@ public static class Roles
         /// <summary>View reports (sales-by-day). Staff + StoreManager + Administrator.</summary>
         public const string ReportsView = "Reports.View";
 
+        /// <summary>
+        /// View the review-sentiment summary + Products-Needing-Attention. StoreManager + Administrator
+        /// — Staff is EXCLUDED (REQUIREMENTS 核心模块 matrix: 评论系统/情感汇总 is SM+Admin only, unlike
+        /// the general Reports.View). Phase 4.
+        /// </summary>
+        public const string SentimentView = "Sentiment.View";
+
         /// <summary>Create/list Staff accounts. StoreManager + Administrator.</summary>
         public const string UsersManageStaff = "Users.ManageStaff";
 

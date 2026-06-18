@@ -48,4 +48,28 @@ public sealed class AnalyticsController : ControllerBase
         SalesReportDto report = await _reports.GetSalesByDayAsync(from, to, ct);
         return Ok(ApiResponse<SalesReportDto>.Ok(report));
     }
+
+    /// <summary>Review-sentiment summary (avg + label distribution + per-product). StoreManager + Administrator.</summary>
+    [HttpGet("sentiment-summary")]
+    [Authorize(Policy = Roles.Policies.SentimentView)]
+    [ProducesResponseType(typeof(ApiResponse<SentimentSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> SentimentSummary(CancellationToken ct)
+    {
+        SentimentSummaryDto summary = await _reports.GetSentimentSummaryAsync(ct);
+        return Ok(ApiResponse<SentimentSummaryDto>.Ok(summary));
+    }
+
+    /// <summary>Products whose average sentiment is below the attention threshold (avg &lt; −0.2).</summary>
+    [HttpGet("products-needing-attention")]
+    [Authorize(Policy = Roles.Policies.SentimentView)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ProductSentimentDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ProductsNeedingAttention(CancellationToken ct)
+    {
+        IReadOnlyList<ProductSentimentDto> products = await _reports.GetProductsNeedingAttentionAsync(ct);
+        return Ok(ApiResponse<IReadOnlyList<ProductSentimentDto>>.Ok(products));
+    }
 }

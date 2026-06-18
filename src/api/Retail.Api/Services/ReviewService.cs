@@ -3,6 +3,7 @@ using Retail.Api.Domain.Entities;
 using Retail.Api.DTOs.Requests;
 using Retail.Api.DTOs.Responses;
 using Retail.Api.Exceptions;
+using Retail.Api.HostedServices;
 using Retail.Api.Mappers;
 using Retail.Api.Repositories;
 
@@ -17,17 +18,20 @@ public sealed class ReviewService : IReviewService
     private readonly IOrderRepository _orders;   // purchase verification
     private readonly IProductRepository _products; // existence check
     private readonly ICustomerProfileService _profiles; // resolves the caller's profile
+    private readonly ReviewSentimentQueue _sentimentQueue; // async sentiment scoring (Chunk 3)
 
     public ReviewService(
         IReviewRepository reviews,
         IOrderRepository orders,
         IProductRepository products,
-        ICustomerProfileService profiles)
+        ICustomerProfileService profiles,
+        ReviewSentimentQueue sentimentQueue)
     {
         _reviews = reviews;
         _orders = orders;
         _products = products;
         _profiles = profiles;
+        _sentimentQueue = sentimentQueue;
     }
 
     /// <inheritdoc />
@@ -63,8 +67,9 @@ public sealed class ReviewService : IReviewService
         await _reviews.AddAsync(review, ct);
         await _reviews.SaveChangesAsync(ct);
 
-        // C3 seam: a ReviewCreated signal is enqueued here for async Azure sentiment scoring (Chunk 3).
-        // Until then SentimentScore/SentimentLabel stay null (the review is "unscored").
+        // Enqueue for async sentiment scoring (Chunk 3): a direct write to the in-process queue — no
+        // MediatR (ADR-0002). The hosted service drains it; SentimentScore/Label stay null until then.
+        _sentimentQueue.Enqueue(review.Id);
 
         return new ReviewDto(
             review.Id,

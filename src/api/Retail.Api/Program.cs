@@ -20,6 +20,7 @@ using Retail.Api.Common.Helpers;
 using Retail.Api.Data;
 using Retail.Api.Data.Interceptors;
 using Retail.Api.Domain.Entities;
+using Retail.Api.HostedServices;
 using Retail.Api.Identity;
 using Retail.Api.Middlewares;
 using Retail.Api.Payments;
@@ -266,6 +267,7 @@ try
 
         options.AddPolicy(Roles.Policies.OrdersRefund, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.UsersManageStaff, p => p.RequireRole(managerPlus));
+        options.AddPolicy(Roles.Policies.SentimentView, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.AuditExport, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.ReportsExport, p => p.RequireRole(managerPlus));
 
@@ -370,6 +372,26 @@ try
             : sp.GetRequiredService<StubLlmClient>();
     });
     builder.Services.AddScoped<ICopyGenService, CopyGenService>();
+
+    // ── AI: Review sentiment (Phase 4 Chunk 3) ────────────────────────────────
+    // Event-driven: ReviewService enqueues review ids on a singleton in-process channel; the hosted
+    // service drains it (fast path) + slow-re-scans ProcessedAt IS NULL (retry / restart recovery).
+    // The adapter follows the same stub-first Ai:Mode switch as the LLM client.
+    builder.Services.AddSingleton<ReviewSentimentQueue>();
+    builder.Services.AddOptions<AzureAiLanguageOptions>()
+        .Bind(builder.Configuration.GetSection(AzureAiLanguageOptions.SectionName));
+    builder.Services.AddScoped<StubTextAnalyticsAdapter>();
+    builder.Services.AddHttpClient<AzureTextAnalyticsAdapter>(client =>
+        client.Timeout = TimeSpan.FromSeconds(30)).AddStandardResilienceHandler();
+    builder.Services.AddScoped<ITextAnalyticsAdapter>(sp =>
+    {
+        AiSettings ai = sp.GetRequiredService<IOptions<AiSettings>>().Value;
+        return ai.IsLive
+            ? sp.GetRequiredService<AzureTextAnalyticsAdapter>()
+            : sp.GetRequiredService<StubTextAnalyticsAdapter>();
+    });
+    builder.Services.AddScoped<IReviewSentimentService, ReviewSentimentService>();
+    builder.Services.AddHostedService<ReviewSentimentHostedService>();
 
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();

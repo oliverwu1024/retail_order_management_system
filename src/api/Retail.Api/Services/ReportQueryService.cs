@@ -54,4 +54,45 @@ public sealed class ReportQueryService : IReportQueryService
 
         return new SalesReportDto(days, categories);
     }
+
+    /// <inheritdoc />
+    public async Task<SentimentSummaryDto> GetSentimentSummaryAsync(CancellationToken ct)
+    {
+        // Only scored reviews (ProcessedAt + SentimentScore set). In-memory aggregation, like sales-by-day.
+        List<Review> scored = await _db.Reviews.AsNoTracking()
+            .Where(r => r.ProcessedAt != null && r.SentimentScore != null)
+            .Include(r => r.Product)
+            .ToListAsync(ct);
+
+        double? average = scored.Count > 0
+            ? Math.Round((double)scored.Average(r => r.SentimentScore!.Value), 3)
+            : null;
+
+        List<LabelCountDto> labels = scored
+            .Where(r => r.SentimentLabel != null)
+            .GroupBy(r => r.SentimentLabel!.Value)
+            .Select(group => new LabelCountDto(group.Key.ToString(), group.Count()))
+            .OrderByDescending(label => label.Count)
+            .ToList();
+
+        // Per-product average sentiment, worst-first (drives the dashboard table + the attention panel).
+        List<ProductSentimentDto> products = scored
+            .GroupBy(r => new { r.ProductId, Name = r.Product != null ? r.Product.Name : "(unknown)" })
+            .Select(group => new ProductSentimentDto(
+                group.Key.ProductId,
+                group.Key.Name,
+                Math.Round((double)group.Average(r => r.SentimentScore!.Value), 3),
+                group.Count()))
+            .OrderBy(product => product.AverageScore)
+            .ToList();
+
+        return new SentimentSummaryDto(average, scored.Count, labels, products);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ProductSentimentDto>> GetProductsNeedingAttentionAsync(CancellationToken ct)
+    {
+        SentimentSummaryDto summary = await GetSentimentSummaryAsync(ct);
+        return summary.Products.Where(product => product.AverageScore < -0.2).ToList();
+    }
 }
