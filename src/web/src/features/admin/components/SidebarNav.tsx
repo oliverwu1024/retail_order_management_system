@@ -17,6 +17,7 @@ const ITEMS: NavItem[] = [
   { to: '/admin/inventory', label: 'Inventory', area: 'inventory' },
   { to: '/admin/audit', label: 'Audit log', area: 'audit' },
   { to: '/admin/reports', label: 'Reports', area: 'reports' },
+  { to: '/admin/chat', label: 'Chat sessions', area: 'chat' },
   { to: '/admin/users', label: 'Users', area: 'users' },
 ]
 

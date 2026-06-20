@@ -4,6 +4,7 @@ import { AdminShell } from '@/components/layouts/AdminShell'
 import { StorefrontShell } from '@/components/layouts/StorefrontShell'
 import { AccountPage } from '@/features/account/AccountPage'
 import { AdminComingSoon } from '@/features/admin/AdminComingSoonPage'
+import { AdminChatPage } from '@/features/admin/AdminChatPage'
 import { AdminHomePage } from '@/features/admin/AdminHomePage'
 import { AdminOrderDetailPage } from '@/features/admin/AdminOrderDetailPage'
 import { AdminOrdersPage } from '@/features/admin/AdminOrdersPage'
@@ -152,6 +153,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.reports}>
             <ReportsPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: 'chat',
+        element: (
+          <RoleGuard allowedRoles={ROLE_SETS.chat}>
+            <AdminChatPage />
           </RoleGuard>
         ),
       },

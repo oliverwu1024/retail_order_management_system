@@ -10,9 +10,10 @@ public interface IChatToolExecutor
 {
     /// <summary>
     /// Runs <paramref name="toolUse"/> on behalf of <paramref name="appUserId"/> (the authenticated
-    /// Identity user — never an id supplied by the model). Returns a JSON string for the
-    /// <c>tool_result</c>. Never throws for ordinary "not found" / unknown-tool cases — it returns a
+    /// Identity user — never an id supplied by the model). Returns a <see cref="ChatToolResult"/>: the
+    /// JSON <c>tool_result</c> for the model, plus an optional proposed action (e.g. a refund the user
+    /// must confirm). Never throws for ordinary "not found" / unknown-tool cases — it returns a
     /// structured result the model can relay.
     /// </summary>
-    Task<string> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct);
+    Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct);
 }

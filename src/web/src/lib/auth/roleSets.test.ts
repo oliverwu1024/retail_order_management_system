@@ -29,8 +29,9 @@ describe('ROLE_SETS capability matrix', () => {
     expect(hasAnyRole(['Administrator'], ROLE_SETS.catalog)).toBe(true)
   })
 
-  it('limits refunds and user management to StoreManager and Administrator', () => {
-    for (const set of [ROLE_SETS.refund, ROLE_SETS.users]) {
+  it('limits refunds, user management, and chat diagnostics to StoreManager and Administrator', () => {
+    // chat mirrors Chat.View (Staff excluded, like Sentiment.View).
+    for (const set of [ROLE_SETS.refund, ROLE_SETS.users, ROLE_SETS.chat]) {
       expect(hasAnyRole(['Staff'], set)).toBe(false)
       expect(hasAnyRole(['StoreManager'], set)).toBe(true)
       expect(hasAnyRole(['Administrator'], set)).toBe(true)

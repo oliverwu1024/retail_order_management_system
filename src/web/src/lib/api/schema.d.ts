@@ -2144,6 +2144,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    Page?: number;
+                    PageSize?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatSessionDtoPagedResultApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatSessionDetailDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -3176,8 +3296,82 @@ export interface components {
             /** Format: int64 */
             totalSalesCents?: number;
         };
+        ChatMessageDto: {
+            role?: string | null;
+            content?: string | null;
+            toolName?: string | null;
+            toolPayloadJson?: string | null;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        ChatProposedAction: {
+            type?: string | null;
+            /** Format: uuid */
+            orderId?: string;
+            /** Format: int32 */
+            orderNumber?: number;
+            /** Format: int32 */
+            refundAmountCents?: number;
+        };
+        ChatSessionDetailDto: {
+            /** Format: uuid */
+            id?: string;
+            conversationId?: string | null;
+            /** Format: uuid */
+            customerProfileId?: string | null;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            lastMessageAt?: string;
+            messages?: components["schemas"]["ChatMessageDto"][] | null;
+        };
+        ChatSessionDetailDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ChatSessionDetailDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        ChatSessionDto: {
+            /** Format: uuid */
+            id?: string;
+            conversationId?: string | null;
+            /** Format: uuid */
+            customerProfileId?: string | null;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            lastMessageAt?: string;
+            /** Format: int32 */
+            messageCount?: number;
+        };
+        ChatSessionDtoPagedResult: {
+            items?: components["schemas"]["ChatSessionDto"][] | null;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            pageSize?: number;
+            /** Format: int32 */
+            totalCount?: number;
+            /** Format: int32 */
+            readonly totalPages?: number;
+            readonly hasNext?: boolean;
+            readonly hasPrevious?: boolean;
+        };
+        ChatSessionDtoPagedResultApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ChatSessionDtoPagedResult"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
         ChatTurnDto: {
             reply?: string | null;
+            proposedAction?: components["schemas"]["ChatProposedAction"];
         };
         ChatTurnDtoApiResponse: {
             success?: boolean;

@@ -68,6 +68,27 @@ public class ChatServiceTests
         Assert.Equal("All sorted.", turn.Reply); // loop continued past the tool failure
     }
 
+    [Fact]
+    public async Task HandleTurn_WhenAToolProposesAnAction_SurfacesItOnTheTurn()
+    {
+        // The model calls a tool then finishes; the tool returns a proposed action (e.g. start_return)
+        // which must ride out on the turn so the storefront can render the Confirm card.
+        int calls = 0;
+        var llm = new FakeLlmClient(_ => ++calls == 1
+            ? new LlmCompletion(null, new[] { new LlmToolUse("t", "start_return", EmptyArgs) }, new LlmUsage(0, 0), "tool_use")
+            : new LlmCompletion("Please confirm the refund.", Array.Empty<LlmToolUse>(), new LlmUsage(0, 0), "end_turn"));
+        var proposal = new ChatProposedAction("confirm_return", Guid.NewGuid(), 10012, 4200);
+        var service = new ChatService(
+            llm, new FakeChatRepository(), new ProposingToolExecutor(proposal), new FakeOrderQueryService(),
+            new FakeCustomerProfileService(), TimeProvider.System, NullLogger<ChatService>.Instance);
+
+        ChatTurnDto turn = await service.HandleTurnAsync("user-1", NewRequest(), CancellationToken.None);
+
+        Assert.NotNull(turn.ProposedAction);
+        Assert.Equal("confirm_return", turn.ProposedAction!.Type);
+        Assert.Equal(10012, turn.ProposedAction.OrderNumber);
+    }
+
     private static readonly JsonElement EmptyArgs = JsonSerializer.SerializeToElement(new { });
 
     private static ChatWebhookRequest NewRequest() =>
@@ -106,13 +127,20 @@ public class ChatServiceTests
 
     private sealed class FakeToolExecutor : IChatToolExecutor
     {
-        public Task<string> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) => Task.FromResult("{}");
+        public Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
+            Task.FromResult(new ChatToolResult("{}"));
     }
 
     private sealed class ThrowingToolExecutor : IChatToolExecutor
     {
-        public Task<string> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
+        public Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
             throw new InvalidOperationException("tool blew up");
+    }
+
+    private sealed class ProposingToolExecutor(ChatProposedAction proposal) : IChatToolExecutor
+    {
+        public Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
+            Task.FromResult(new ChatToolResult("{\"eligible\":true}", proposal));
     }
 
     private sealed class FakeOrderQueryService : IOrderQueryService

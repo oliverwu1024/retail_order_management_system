@@ -130,9 +130,10 @@ public sealed class ChatService : IChatService
         // ── Run the loop ─────────────────────────────────────────────────────
         string systemPrompt = await BuildSystemPromptAsync(appUserId, ct);
         string reply;
+        ChatProposedAction? proposedAction = null;
         try
         {
-            reply = await RunLoopAsync(systemPrompt, messages, appUserId, session, ct);
+            (reply, proposedAction) = await RunLoopAsync(systemPrompt, messages, appUserId, session, ct);
             _repo.AddMessage(new ChatMessage { ChatSession = session, Role = ChatMessageRole.Assistant, Content = reply });
         }
         catch (ExternalServiceException ex)
@@ -144,16 +145,18 @@ public sealed class ChatService : IChatService
         }
 
         await _repo.SaveChangesAsync(ct);
-        return new ChatTurnDto(reply);
+        return new ChatTurnDto(reply, proposedAction);
     }
 
     /// <summary>
     /// The agentic loop: call Claude; if it asks for tools, execute them owner-scoped, append the
     /// assistant tool_use turn + a user tool_result turn, and go again — up to <see cref="MaxToolTurns"/>.
     /// </summary>
-    private async Task<string> RunLoopAsync(
+    private async Task<(string Reply, ChatProposedAction? Proposed)> RunLoopAsync(
         string systemPrompt, List<LlmMessage> messages, string appUserId, ChatSession session, CancellationToken ct)
     {
+        ChatProposedAction? proposed = null;
+
         for (int turn = 0; turn < MaxToolTurns; turn++)
         {
             var llmRequest = new LlmRequest(
@@ -173,23 +176,35 @@ public sealed class ChatService : IChatService
             {
                 // Guard the empty-reply path: a live model can stop with no text — never hand the
                 // customer a blank bubble (the stub always has text, so this only bites live).
-                return string.IsNullOrWhiteSpace(completion.Text) ? GiveUpReply : completion.Text;
+                string text = string.IsNullOrWhiteSpace(completion.Text) ? GiveUpReply : completion.Text;
+                return (text, proposed);
             }
+
+            // Each tool-executing round starts with a clean proposal slate, so only the LAST round's
+            // proposal rides out — a later ineligible/not-found start_return can't leave a stale card.
+            proposed = null;
 
             // Execute each requested tool, persist a diagnostics row, collect the results.
             var toolResults = new List<LlmToolResult>(completion.ToolUses.Count);
             foreach (LlmToolUse use in completion.ToolUses)
             {
-                string result = ClampToolResult(await ExecuteToolSafelyAsync(appUserId, use, ct));
+                ChatToolResult toolResult = await ExecuteToolSafelyAsync(appUserId, use, ct);
+                string content = ClampToolResult(toolResult.Content);
+                // A confirmation-gated tool (start_return) surfaces a proposal — carry the latest one
+                // onto the final turn so the storefront can render the Confirm card.
+                if (toolResult.ProposedAction is not null)
+                {
+                    proposed = toolResult.ProposedAction;
+                }
                 _repo.AddMessage(new ChatMessage
                 {
                     ChatSession = session,
                     Role = ChatMessageRole.Tool,
                     Content = $"Called {use.Name}.",
                     ToolName = use.Name,
-                    ToolPayloadJson = result,
+                    ToolPayloadJson = content,
                 });
-                toolResults.Add(new LlmToolResult(use.Id, result));
+                toolResults.Add(new LlmToolResult(use.Id, content));
             }
 
             // Echo the assistant's tool_use turn, then answer with the tool results, and loop.
@@ -198,10 +213,10 @@ public sealed class ChatService : IChatService
         }
 
         _logger.LogWarning("Chat loop hit MaxToolTurns={Max} for user {UserId}.", MaxToolTurns, appUserId);
-        return GiveUpReply;
+        return (GiveUpReply, proposed);
     }
 
-    private async Task<string> ExecuteToolSafelyAsync(string appUserId, LlmToolUse use, CancellationToken ct)
+    private async Task<ChatToolResult> ExecuteToolSafelyAsync(string appUserId, LlmToolUse use, CancellationToken ct)
     {
         try
         {
@@ -211,7 +226,8 @@ public sealed class ChatService : IChatService
         {
             // A tool bug must not abort the whole turn — hand the model a generic failure it can relay.
             _logger.LogError(ex, "Chat tool {Tool} threw for user {UserId}.", use.Name, appUserId);
-            return JsonSerializer.Serialize(new { error = "That action couldn't be completed right now." });
+            return new ChatToolResult(
+                JsonSerializer.Serialize(new { error = "That action couldn't be completed right now." }));
         }
     }
 

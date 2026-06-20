@@ -23,15 +23,18 @@ namespace Retail.Api.Controllers;
 public sealed class ChatController : ControllerBase
 {
     private readonly IChatService _chat;
+    private readonly IChatQueryService _chatQuery;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IValidator<ChatWebhookRequest> _validator;
 
     public ChatController(
         IChatService chat,
+        IChatQueryService chatQuery,
         ICurrentUserAccessor currentUser,
         IValidator<ChatWebhookRequest> validator)
     {
         _chat = chat;
+        _chatQuery = chatQuery;
         _currentUser = currentUser;
         _validator = validator;
     }
@@ -56,6 +59,31 @@ public sealed class ChatController : ControllerBase
 
         ChatTurnDto turn = await _chat.HandleTurnAsync(userId, request, ct);
         return Ok(ApiResponse<ChatTurnDto>.Ok(turn));
+    }
+
+    /// <summary>Admin diagnostics: lists chat sessions (most recently active first), paged.</summary>
+    [HttpGet("sessions")]
+    [Authorize(Policy = Roles.Policies.ChatView)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ChatSessionDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListSessions([FromQuery] ChatSessionListQuery query, CancellationToken ct)
+    {
+        PagedResult<ChatSessionDto> result = await _chatQuery.ListSessionsAsync(query, ct);
+        return Ok(ApiResponse<PagedResult<ChatSessionDto>>.Ok(result));
+    }
+
+    /// <summary>Admin diagnostics: one chat session with its full message history.</summary>
+    [HttpGet("sessions/{id:guid}")]
+    [Authorize(Policy = Roles.Policies.ChatView)]
+    [ProducesResponseType(typeof(ApiResponse<ChatSessionDetailDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSession(Guid id, CancellationToken ct)
+    {
+        ChatSessionDetailDto session = await _chatQuery.GetSessionAsync(id, ct);
+        return Ok(ApiResponse<ChatSessionDetailDto>.Ok(session));
     }
 
     // [Authorize] guarantees an authenticated principal, but we resolve the id defensively.

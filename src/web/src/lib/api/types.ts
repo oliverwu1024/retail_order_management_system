@@ -43,3 +43,7 @@ export type ProductSentiment = Schemas['ProductSentimentDto']
 
 export type ChatTurn = Schemas['ChatTurnDto']
 export type ChatWebhookRequest = Schemas['ChatWebhookRequest']
+export type ChatProposedAction = Schemas['ChatProposedAction']
+export type ChatSession = Schemas['ChatSessionDto']
+export type ChatSessionDetail = Schemas['ChatSessionDetailDto']
+export type ChatSessionPage = Schemas['ChatSessionDtoPagedResult']

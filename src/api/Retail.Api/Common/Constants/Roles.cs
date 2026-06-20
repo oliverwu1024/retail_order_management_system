@@ -92,6 +92,12 @@ public static class Roles
         /// </summary>
         public const string SentimentView = "Sentiment.View";
 
+        /// <summary>
+        /// View customer support-chat session history (admin diagnostics). StoreManager + Administrator
+        /// — Staff excluded, mirroring <see cref="SentimentView"/> (REQUIREMENTS chat matrix). Phase 5A.
+        /// </summary>
+        public const string ChatView = "Chat.View";
+
         /// <summary>Create/list Staff accounts. StoreManager + Administrator.</summary>
         public const string UsersManageStaff = "Users.ManageStaff";
 

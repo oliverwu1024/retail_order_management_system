@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Retail.Api.Ai.Chat;
 using Retail.Api.Ai.Contracts;
+using Retail.Api.Common.Enums;
 using Retail.Api.Common.Models;
 using Retail.Api.Domain.Entities;
 using Retail.Api.DTOs.Responses;
@@ -31,14 +32,14 @@ public sealed class ChatToolExecutor : IChatToolExecutor
     }
 
     /// <inheritdoc />
-    public async Task<string> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct)
+    public async Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct)
     {
         switch (toolUse.Name)
         {
             case ChatTools.ListMyRecentOrders:
             {
                 PagedResult<OrderSummaryDto> page = await _orderQuery.GetMyOrdersAsync(appUserId, 1, RecentOrderCount, ct);
-                return Json(new
+                return Tool(new
                 {
                     orders = page.Items.Select(o => new
                     {
@@ -55,16 +56,16 @@ public sealed class ChatToolExecutor : IChatToolExecutor
             {
                 if (!TryReadOrderNumber(toolUse.Input, out int number))
                 {
-                    return Json(new { error = "An order number is required." });
+                    return Tool(new { error = "An order number is required." });
                 }
 
                 Order? order = await LoadOwnedOrderAsync(appUserId, number, ct);
                 if (order is null)
                 {
-                    return Json(new { found = false, message = $"Order #{number} was not found in your account." });
+                    return Tool(new { found = false, message = $"Order #{number} was not found in your account." });
                 }
 
-                return Json(new
+                return Tool(new
                 {
                     found = true,
                     order = new
@@ -87,17 +88,17 @@ public sealed class ChatToolExecutor : IChatToolExecutor
             {
                 if (!TryReadOrderNumber(toolUse.Input, out int number))
                 {
-                    return Json(new { error = "An order number is required." });
+                    return Tool(new { error = "An order number is required." });
                 }
 
                 Order? order = await LoadOwnedOrderAsync(appUserId, number, ct);
                 if (order is null)
                 {
-                    return Json(new { found = false, message = $"Order #{number} was not found in your account." });
+                    return Tool(new { found = false, message = $"Order #{number} was not found in your account." });
                 }
 
                 Shipment? shipment = order.Shipment;
-                return Json(new
+                return Tool(new
                 {
                     found = true,
                     orderNumber = order.OrderNumber,
@@ -115,14 +116,62 @@ public sealed class ChatToolExecutor : IChatToolExecutor
                 });
             }
 
+            case ChatTools.StartReturn:
+                return await ProposeReturnAsync(appUserId, toolUse.Input, ct);
+
             // Phase-7 features — stubbed so the model can answer honestly rather than guess.
             case ChatTools.GetMyLoyaltyBalance:
             case ChatTools.ListMyVouchers:
-                return Json(new { available = false, message = "Loyalty points and vouchers aren't available yet — they're coming in a future release." });
+                return Tool(new { available = false, message = "Loyalty points and vouchers aren't available yet — they're coming in a future release." });
 
             default:
-                return Json(new { error = $"Unknown tool '{toolUse.Name}'." });
+                return Tool(new { error = $"Unknown tool '{toolUse.Name}'." });
         }
+    }
+
+    /// <summary>
+    /// Owner-scoped, Paid-only eligibility check for a return. Returns a PROPOSAL only — it never
+    /// cancels or refunds. The refund happens only when the customer confirms in the app, which calls
+    /// the existing cancel endpoint (OrderCancellationService). A non-Paid order (already shipped,
+    /// refunded, …) comes back ineligible with a plain explanation.
+    /// </summary>
+    private async Task<ChatToolResult> ProposeReturnAsync(string appUserId, JsonElement input, CancellationToken ct)
+    {
+        if (!TryReadOrderNumber(input, out int number))
+        {
+            return Tool(new { error = "An order number is required." });
+        }
+
+        Order? order = await LoadOwnedOrderAsync(appUserId, number, ct);
+        if (order is null)
+        {
+            return Tool(new { found = false, message = $"Order #{number} was not found in your account." });
+        }
+
+        if (order.Status != OrderStatus.Paid)
+        {
+            return Tool(new
+            {
+                found = true,
+                eligible = false,
+                message = $"Order #{order.OrderNumber} can't be cancelled for a refund because its status is "
+                    + $"{order.Status}. Only a paid order that hasn't shipped yet can be cancelled here.",
+            });
+        }
+
+        var proposal = new ChatProposedAction("confirm_return", order.Id, order.OrderNumber, order.TotalCents);
+        return new ChatToolResult(
+            Json(new
+            {
+                found = true,
+                eligible = true,
+                orderNumber = order.OrderNumber,
+                refundAmountCents = order.TotalCents,
+                message = $"Order #{order.OrderNumber} is eligible for cancellation and a full refund. Tell the "
+                    + "customer the amount and ask them to confirm — do NOT say it is already done; the app shows a "
+                    + "Confirm button.",
+            }),
+            proposal);
     }
 
     private async Task<Order?> LoadOwnedOrderAsync(string appUserId, int orderNumber, CancellationToken ct)
@@ -180,6 +229,9 @@ public sealed class ChatToolExecutor : IChatToolExecutor
 
         return false;
     }
+
+    /// <summary>Wraps a read-only tool result (no proposed action) as a <see cref="ChatToolResult"/>.</summary>
+    private static ChatToolResult Tool(object value) => new(Json(value));
 
     private static string Json(object value) => JsonSerializer.Serialize(value);
 }

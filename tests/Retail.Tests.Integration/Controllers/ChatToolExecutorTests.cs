@@ -103,15 +103,67 @@ public class ChatToolExecutorTests
         Assert.False(vouchers.GetProperty("available").GetBoolean());
     }
 
+    [Fact]
+    public async Task StartReturn_OwnedPaidOrder_ProposesRefundWithoutMutating()
+    {
+        (string appUserId, Guid profileId) = await RegisterCustomerAsync("Returner");
+        int orderNumber = await SeedOrderAsync(profileId, withShipment: false); // Paid
+
+        ChatToolResult result = await ExecuteRawAsync(appUserId, "start_return", new { orderNumber, reason = "changed mind" });
+
+        JsonElement json = JsonSerializer.Deserialize<JsonElement>(result.Content);
+        Assert.True(json.GetProperty("eligible").GetBoolean());
+        Assert.NotNull(result.ProposedAction);
+        Assert.Equal("confirm_return", result.ProposedAction!.Type);
+        Assert.Equal(orderNumber, result.ProposedAction.OrderNumber);
+        Assert.Equal(PriceCents, result.ProposedAction.RefundAmountCents); // refund = the order total
+
+        // Proposal only — the order is untouched (still Paid). The refund happens on confirm.
+        using IServiceScope scope = _factory.Services.CreateScope();
+        RetailDbContext db = scope.ServiceProvider.GetRequiredService<RetailDbContext>();
+        OrderStatus status = await db.Orders.Where(o => o.OrderNumber == orderNumber).Select(o => o.Status).SingleAsync();
+        Assert.Equal(OrderStatus.Paid, status);
+    }
+
+    [Fact]
+    public async Task StartReturn_FulfilledOrder_IsIneligibleWithNoProposal()
+    {
+        (string appUserId, Guid profileId) = await RegisterCustomerAsync("Shipped");
+        int orderNumber = await SeedOrderAsync(profileId, withShipment: true); // Fulfilled
+
+        ChatToolResult result = await ExecuteRawAsync(appUserId, "start_return", new { orderNumber });
+
+        Assert.False(JsonSerializer.Deserialize<JsonElement>(result.Content).GetProperty("eligible").GetBoolean());
+        Assert.Null(result.ProposedAction);
+    }
+
+    [Fact]
+    public async Task StartReturn_AnotherCustomersOrder_ReturnsNotFound()
+    {
+        (string callerUserId, _) = await RegisterCustomerAsync("Caller");
+        (_, Guid otherProfileId) = await RegisterCustomerAsync("Other");
+        int othersOrder = await SeedOrderAsync(otherProfileId, withShipment: false);
+
+        ChatToolResult result = await ExecuteRawAsync(callerUserId, "start_return", new { orderNumber = othersOrder });
+
+        Assert.False(JsonSerializer.Deserialize<JsonElement>(result.Content).GetProperty("found").GetBoolean());
+        Assert.Null(result.ProposedAction); // not-owned ≡ not-found: no proposal leaks
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<JsonElement> ExecuteAsync(string appUserId, string toolName, object args)
     {
+        ChatToolResult result = await ExecuteRawAsync(appUserId, toolName, args);
+        return JsonSerializer.Deserialize<JsonElement>(result.Content);
+    }
+
+    private async Task<ChatToolResult> ExecuteRawAsync(string appUserId, string toolName, object args)
+    {
         using IServiceScope scope = _factory.Services.CreateScope();
         IChatToolExecutor executor = scope.ServiceProvider.GetRequiredService<IChatToolExecutor>();
         var toolUse = new LlmToolUse(Id: "t1", Name: toolName, Input: JsonSerializer.SerializeToElement(args));
-        string json = await executor.ExecuteAsync(appUserId, toolUse, CancellationToken.None);
-        return JsonSerializer.Deserialize<JsonElement>(json);
+        return await executor.ExecuteAsync(appUserId, toolUse, CancellationToken.None);
     }
 
     /// <summary>Registers a Customer, returns the Identity user id (appUserId) + the CustomerProfileId.</summary>

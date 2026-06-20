@@ -269,6 +269,7 @@ try
         options.AddPolicy(Roles.Policies.OrdersRefund, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.UsersManageStaff, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.SentimentView, p => p.RequireRole(managerPlus));
+        options.AddPolicy(Roles.Policies.ChatView, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.AuditExport, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.ReportsExport, p => p.RequireRole(managerPlus));
 
@@ -402,6 +403,7 @@ try
     builder.Services.AddScoped<IChatToolExecutor, ChatToolExecutor>();
     builder.Services.AddScoped<IChatRepository, ChatRepository>();
     builder.Services.AddScoped<IChatService, ChatService>();
+    builder.Services.AddScoped<IChatQueryService, ChatQueryService>();
 
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
