@@ -42,4 +42,7 @@ public sealed class AiModelMap
 {
     /// <summary>Model backing product copy generation. Anthropic Claude Sonnet (ADR-0005).</summary>
     public string Copy { get; set; } = "claude-sonnet-4-6";
+
+    /// <summary>Model backing the support chatbot's tool-use loop (Phase 5A). Sonnet — plenty for tool routing.</summary>
+    public string Chat { get; set; } = "claude-sonnet-4-6";
 }

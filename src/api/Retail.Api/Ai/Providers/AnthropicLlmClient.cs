@@ -62,19 +62,31 @@ public sealed class AnthropicLlmClient : ILlmClient
             throw new ExternalServiceException($"The AI provider returned an error ({(int)response.StatusCode}).");
         }
 
-        await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
-        using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        return MapCompletion(doc.RootElement);
+        try
+        {
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return MapCompletion(doc.RootElement);
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            // A malformed / unexpected provider response is an EXTERNAL failure, not a server bug — so
+            // surface it as ExternalServiceException. That keeps the failure path uniform: CopyGen maps
+            // it to a 503, and the chat loop catches it to degrade to a friendly HTTP 200 (scope §3.5/§6).
+            // (OperationCanceledException is intentionally NOT caught — cancellation must propagate.)
+            throw new ExternalServiceException("The AI provider returned a response that could not be parsed.", ex);
+        }
     }
 
     private Dictionary<string, object?> BuildRequestBody(LlmRequest request)
     {
-        // Copy-gen is single-turn (one user text message); the Phase-5 chat loop will extend this
-        // to map tool_use / tool_result content blocks.
+        // Each message maps to a content-block ARRAY when it carries tool_use / tool_result blocks
+        // (the multi-turn chat loop), or a plain string for an ordinary text turn. We never emit
+        // content:"" on a tool-bearing turn — the Messages API rejects empty-string content.
         var messages = request.Messages.Select(m => new
         {
             role = m.Role == LlmRole.Assistant ? "assistant" : "user",
-            content = m.Text ?? string.Empty,
+            content = BuildMessageContent(m),
         }).ToArray();
 
         var body = new Dictionary<string, object?>
@@ -105,9 +117,43 @@ public sealed class AnthropicLlmClient : ILlmClient
         return body;
     }
 
+    /// <summary>
+    /// Maps a provider-agnostic message to the Anthropic wire <c>content</c>: a plain string for a
+    /// text-only turn, or a content-block array for an assistant turn that called tools
+    /// (<c>tool_use</c> blocks) / a user turn carrying results (<c>tool_result</c> blocks).
+    /// </summary>
+    private static object BuildMessageContent(LlmMessage m)
+    {
+        // tool_result blocks ride a USER message (Anthropic has no "tool" role).
+        if (m.ToolResults is { Count: > 0 })
+        {
+            return m.ToolResults
+                .Select(r => new { type = "tool_result", tool_use_id = r.ToolUseId, content = r.Content })
+                .ToArray();
+        }
+
+        // An assistant turn that called tools: an optional leading text block, then one tool_use block
+        // per call. Every tool_use id must be answered by a matching tool_result in the next turn.
+        if (m.ToolUses is { Count: > 0 })
+        {
+            var blocks = new List<object>();
+            if (!string.IsNullOrEmpty(m.Text))
+            {
+                blocks.Add(new { type = "text", text = m.Text });
+            }
+            blocks.AddRange(m.ToolUses.Select(u =>
+                new { type = "tool_use", id = u.Id, name = u.Name, input = (object)u.Input }));
+            return blocks;
+        }
+
+        // Ordinary text turn → a plain string (Anthropic accepts a string for content).
+        return m.Text ?? string.Empty;
+    }
+
     private string ResolveModel(string logical) => logical switch
     {
         "copy" => _settings.Models.Copy,
+        "chat" => _settings.Models.Chat,
         _ => logical, // already a concrete id
     };
 
@@ -130,7 +176,8 @@ public sealed class AnthropicLlmClient : ILlmClient
                             Input: block.GetProperty("input").Clone()));
                         break;
                     case "text":
-                        text = block.GetProperty("text").GetString();
+                        // Concatenate in case the assistant interleaves multiple text blocks with tool_use.
+                        text = (text ?? string.Empty) + block.GetProperty("text").GetString();
                         break;
                 }
             }

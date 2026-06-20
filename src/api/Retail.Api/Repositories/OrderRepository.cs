@@ -59,6 +59,13 @@ public sealed class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.Id == orderId && o.CustomerProfileId == customerProfileId, ct);
 
     /// <inheritdoc />
+    public async Task<Order?> GetOwnedByOrderNumberAsync(int orderNumber, Guid customerProfileId, CancellationToken ct) =>
+        await _db.Orders.AsNoTracking()
+            .Include(o => o.Lines)
+            .Include(o => o.Shipment)
+            .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber && o.CustomerProfileId == customerProfileId, ct);
+
+    /// <inheritdoc />
     public async Task<Order?> GetDetailByStripeSessionIdAsync(string stripeSessionId, CancellationToken ct) =>
         await _db.Orders.AsNoTracking()
             .Include(o => o.Lines)

@@ -27,6 +27,14 @@ public interface IOrderRepository
     Task<Order?> GetOwnedByIdAsync(Guid orderId, Guid customerProfileId, CancellationToken ct);
 
     /// <summary>
+    /// An order by its human <c>OrderNumber</c> scoped to its owner, with lines AND shipment, read-only.
+    /// Backs the chatbot's <c>get_order</c> / <c>get_shipping_status</c> tools (Phase 5A): a customer
+    /// quotes the order number, and the owner filter means a number that isn't theirs returns null
+    /// (not-found, never another user's order). Null if missing or not the caller's.
+    /// </summary>
+    Task<Order?> GetOwnedByOrderNumberAsync(int orderNumber, Guid customerProfileId, CancellationToken ct);
+
+    /// <summary>
     /// Whether the customer has a completed purchase (an order in <c>Paid</c>/<c>Fulfilled</c>) with a
     /// line for any variant of the product — the "verified purchase" gate for reviews (Story 4.1).
     /// </summary>

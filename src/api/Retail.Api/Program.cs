@@ -395,6 +395,14 @@ try
     builder.Services.AddScoped<IReviewSentimentService, ReviewSentimentService>();
     builder.Services.AddHostedService<ReviewSentimentHostedService>();
 
+    // ── AI: Support chatbot (Phase 5A) ────────────────────────────────────────
+    // Reuses the ILlmClient seam (stub/Anthropic by Ai:Mode). The multi-turn tool_use/tool_result
+    // loop lives in ChatService; the tools are owner-scoped via the existing order read-services, so
+    // a customer only ever sees their own data.
+    builder.Services.AddScoped<IChatToolExecutor, ChatToolExecutor>();
+    builder.Services.AddScoped<IChatRepository, ChatRepository>();
+    builder.Services.AddScoped<IChatService, ChatService>();
+
     // ── Admin operations (Phase 3) ──────────────────────────────────────────
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
