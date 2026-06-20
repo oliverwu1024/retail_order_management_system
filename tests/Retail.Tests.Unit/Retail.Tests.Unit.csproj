@@ -10,6 +10,15 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <!--
+      Override the SQLite native lib that EF Core Sqlite pulls transitively (2.1.11),
+      which carries advisory GHSA-2m69-gcr7-jv3q and fails NuGet audit under our
+      TreatWarningsAsErrors. The advisory's vulnerable range is "<= 2.1.11" with no
+      patched 2.x; the post-2.x line (bundle 3.0.3 -> lib.e_sqlite3 3.50.3) is outside
+      that range and clears the audit. Test-only dependency; drop this once EF Core
+      itself moves to SQLitePCLRaw 3.x.
+    -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
