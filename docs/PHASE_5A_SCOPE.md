@@ -366,6 +366,7 @@ Functions) and Phase 8, not here. 5A's payoff is the **B-1 component** + the
 - **Post-delivery returns / RMA entity** — out (no domain support); revisit only if a bullet needs it.
 - **CSRF exemption is a path-prefix (`StartsWithSegments`) check** — when the Phase-6 Copilot/HMAC arm is added, give it its own HMAC-validated path so it does **not** inherit the Stripe exemption.
 - ~~**Fold `0010_chat_sessions` + the split into DATABASE_DESIGN §5**~~ — ✅ done in C4 (DATABASE_DESIGN §5 rows 5A/5B); §8 naming + other deltas reconciled in §19. 5B will add `0011_forecast_anomaly`.
+- **Phase-end review deferrals (low/nit — not blocking):** an `IAuditWriter` "ChatTranscriptViewed" row when an admin opens a transcript (admin reads of customer PII are currently un-audited); a Playwright chat golden-path E2E + `@axe-core` open-drawer scan + a `sheet.tsx` focus/escape test (scope §14 listed these; the unit/integration/Vitest set covers behaviour, so deferred); focus the composer on drawer open (focus currently lands on the ✕); preserve the typed message on a hard send-failure; announce/focus the Confirm card; `aria-expanded`/`aria-haspopup` on the launcher FAB; demo-seeder spreads timestamps so the diagnostics list orders deterministically. None affect correctness/security of the shipped feature.
 
 ## 18. Known limitations (5A)
 

@@ -68,8 +68,15 @@ public sealed class ChatService : IChatService
         Guid profileId = (await _profiles.GetMyProfileAsync(appUserId, ct)).Id;
         DateTimeOffset now = _clock.GetUtcNow();
 
+        // Normalize to the canonical 36-char "D" form. The validator allows any Guid-parseable id, but
+        // braced/parenthesized/padded variants are 38–40 chars while ConversationId is char(36) —
+        // persisting a raw oversized value would throw a truncation SqlException (not 2601/2627), which
+        // the race-catch wouldn't handle → an unhandled 500 on a public POST. (Guid.Parse is safe here:
+        // the validator already proved it parses.)
+        string conversationId = Guid.Parse(request.ConversationId).ToString("D");
+
         // ── Upsert the session, owner-checked + race-safe ────────────────────
-        ChatSession? existing = await _repo.GetSessionByConversationIdAsync(request.ConversationId, ct);
+        ChatSession? existing = await _repo.GetSessionByConversationIdAsync(conversationId, ct);
         if (existing is not null && existing.CustomerProfileId != profileId)
         {
             // Someone else's conversation id → not-found (don't confirm it exists). Matches the
@@ -91,7 +98,7 @@ public sealed class ChatService : IChatService
             var fresh = new ChatSession
             {
                 CustomerProfileId = profileId,
-                ConversationId = request.ConversationId,
+                ConversationId = conversationId,
                 StartedAt = now,
                 LastMessageAt = now,
             };
@@ -165,7 +172,7 @@ public sealed class ChatService : IChatService
                 Messages: messages,
                 Tools: ChatTools.All,
                 ToolChoice: LlmToolChoice.Auto,
-                MaxTokens: 1024);
+                MaxTokens: 2048); // headroom for tool routing + a warm reply (Sonnet's ceiling is far higher)
 
             LlmCompletion completion = await _llm.CompleteAsync(llmRequest, ct);
             _logger.LogInformation(
@@ -180,19 +187,17 @@ public sealed class ChatService : IChatService
                 return (text, proposed);
             }
 
-            // Each tool-executing round starts with a clean proposal slate, so only the LAST round's
-            // proposal rides out — a later ineligible/not-found start_return can't leave a stale card.
-            proposed = null;
-
             // Execute each requested tool, persist a diagnostics row, collect the results.
             var toolResults = new List<LlmToolResult>(completion.ToolUses.Count);
             foreach (LlmToolUse use in completion.ToolUses)
             {
                 ChatToolResult toolResult = await ExecuteToolSafelyAsync(appUserId, use, ct);
                 string content = ClampToolResult(toolResult.Content);
-                // A confirmation-gated tool (start_return) surfaces a proposal — carry the latest one
-                // onto the final turn so the storefront can render the Confirm card.
-                if (toolResult.ProposedAction is not null)
+                // Only a start_return call changes the pending proposal: an eligible one sets the Confirm
+                // card, an ineligible/not-found one (ProposedAction == null) clears it. A read-only tool
+                // in a later round must NOT drop a still-valid proposal the customer hasn't acted on, and
+                // a stale eligible proposal can't survive a later ineligible start_return.
+                if (use.Name == ChatTools.StartReturn)
                 {
                     proposed = toolResult.ProposedAction;
                 }

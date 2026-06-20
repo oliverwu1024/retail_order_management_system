@@ -115,6 +115,18 @@ public class ChatWebhookTests
     }
 
     [Fact]
+    public async Task Webhook_BracedGuidConversationId_Returns200_NotTruncationError()
+    {
+        // A braced GUID ("{...}", 38 chars) parses (passes validation) but is > char(36); the service
+        // normalizes it to the canonical 36-char form rather than 500-ing on a truncated insert.
+        (HttpClient client, string csrf, _) = await RegisterCustomerAsync("Braces");
+        HttpResponseMessage resp = await PostJsonAsync(client, "/api/v1/chat/webhook",
+            new { conversationId = $"{{{Guid.NewGuid()}}}", message = "hi" }, csrf);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task Webhook_NonGuidConversationId_Returns422()
     {
         (HttpClient client, string csrf, _) = await RegisterCustomerAsync("Di");

@@ -89,6 +89,29 @@ public class ChatServiceTests
         Assert.Equal(10012, turn.ProposedAction.OrderNumber);
     }
 
+    [Fact]
+    public async Task HandleTurn_ProposalSurvivesALaterReadToolRound()
+    {
+        // start_return proposes (round 1), the model then calls a READ tool (round 2), then finishes.
+        // The read-tool round must NOT drop the still-valid Confirm proposal (L5A-3).
+        int calls = 0;
+        var llm = new FakeLlmClient(_ => ++calls switch
+        {
+            1 => new LlmCompletion(null, new[] { new LlmToolUse("t1", "start_return", EmptyArgs) }, new LlmUsage(0, 0), "tool_use"),
+            2 => new LlmCompletion(null, new[] { new LlmToolUse("t2", "list_my_recent_orders", EmptyArgs) }, new LlmUsage(0, 0), "tool_use"),
+            _ => new LlmCompletion("All set.", Array.Empty<LlmToolUse>(), new LlmUsage(0, 0), "end_turn"),
+        });
+        var proposal = new ChatProposedAction("confirm_return", Guid.NewGuid(), 10012, 4200);
+        var service = new ChatService(
+            llm, new FakeChatRepository(), new StartReturnOnlyToolExecutor(proposal), new FakeOrderQueryService(),
+            new FakeCustomerProfileService(), TimeProvider.System, NullLogger<ChatService>.Instance);
+
+        ChatTurnDto turn = await service.HandleTurnAsync("user-1", NewRequest(), CancellationToken.None);
+
+        Assert.NotNull(turn.ProposedAction);
+        Assert.Equal(10012, turn.ProposedAction!.OrderNumber);
+    }
+
     private static readonly JsonElement EmptyArgs = JsonSerializer.SerializeToElement(new { });
 
     private static ChatWebhookRequest NewRequest() =>
@@ -141,6 +164,15 @@ public class ChatServiceTests
     {
         public Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
             Task.FromResult(new ChatToolResult("{\"eligible\":true}", proposal));
+    }
+
+    // Returns the proposal only for start_return; read tools return a plain result (no proposal).
+    private sealed class StartReturnOnlyToolExecutor(ChatProposedAction proposal) : IChatToolExecutor
+    {
+        public Task<ChatToolResult> ExecuteAsync(string appUserId, LlmToolUse toolUse, CancellationToken ct) =>
+            Task.FromResult(toolUse.Name == "start_return"
+                ? new ChatToolResult("{\"eligible\":true}", proposal)
+                : new ChatToolResult("{}"));
     }
 
     private sealed class FakeOrderQueryService : IOrderQueryService

@@ -57,9 +57,21 @@ public sealed class AnthropicLlmClient : ILlmClient
 
         if (!response.IsSuccessStatusCode)
         {
+            int status = (int)response.StatusCode;
             string detail = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogWarning("Anthropic Messages API returned {Status}: {Detail}", (int)response.StatusCode, detail);
-            throw new ExternalServiceException($"The AI provider returned an error ({(int)response.StatusCode}).");
+            // A non-429 4xx means OUR request/config is wrong (bad model id, bad/expired key, malformed
+            // body) — log loud so it's caught at deploy/live-flip time. 429/5xx are transient provider
+            // blips → warning.
+            if (status is 400 or 401 or 403 or 404)
+            {
+                _logger.LogError("Anthropic Messages API rejected the request ({Status}): {Detail}", status, detail);
+            }
+            else
+            {
+                _logger.LogWarning("Anthropic Messages API returned {Status}: {Detail}", status, detail);
+            }
+
+            throw new ExternalServiceException($"The AI provider returned an error ({status}).");
         }
 
         try

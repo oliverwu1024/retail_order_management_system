@@ -135,8 +135,14 @@ export function ChatDrawer() {
             />
           ) : null}
           {send.isPending ? (
-            <div className="flex justify-start">
-              <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">…</div>
+            <div className="flex justify-start" role="status">
+              <span className="sr-only">Assistant is typing…</span>
+              <div
+                className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"
+                aria-hidden="true"
+              >
+                …
+              </div>
             </div>
           ) : null}
           <div ref={listEndRef} />

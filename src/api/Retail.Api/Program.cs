@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -365,8 +366,18 @@ try
     builder.Services.AddHttpClient<AnthropicLlmClient>(client =>
     {
         client.BaseAddress = new Uri("https://api.anthropic.com");
-        client.Timeout = TimeSpan.FromSeconds(30);
-    }).AddStandardResilienceHandler(); // Polly: retry + circuit breaker + timeout
+        client.Timeout = Timeout.InfiniteTimeSpan; // the resilience handler owns the timeouts below
+    }).AddStandardResilienceHandler(o =>
+    {
+        // An LLM completion is SLOW (multi-second) and a Messages POST is NON-idempotent (each call is
+        // a billed turn). The GET-tuned defaults (10s attempt timeout + retry-on-timeout) would truncate
+        // slow turns and re-bill them, or self-inflict the "having trouble" fallback under tail latency.
+        // Widen the timeouts and never retry the unsafe POST.
+        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(45);
+        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(90); // must be >= 2x attempt timeout
+        o.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(90); // must be >= 2x attempt timeout
+        o.Retry.DisableForUnsafeHttpMethods();
+    });
     // Single ILlmClient binding — business code never sees a concrete provider type.
     builder.Services.AddScoped<ILlmClient>(sp =>
     {
