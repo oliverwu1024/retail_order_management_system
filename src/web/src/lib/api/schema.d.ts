@@ -2085,6 +2085,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ChatWebhookRequest"];
+                    "text/json": components["schemas"]["ChatWebhookRequest"];
+                    "application/*+json": components["schemas"]["ChatWebhookRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatTurnDtoApiResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+                /** @description Unprocessable Content */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -3116,6 +3175,22 @@ export interface components {
             category?: string | null;
             /** Format: int64 */
             totalSalesCents?: number;
+        };
+        ChatTurnDto: {
+            reply?: string | null;
+        };
+        ChatTurnDtoApiResponse: {
+            success?: boolean;
+            data?: components["schemas"]["ChatTurnDto"];
+            message?: string | null;
+            errors?: components["schemas"]["ApiError"][] | null;
+            traceId?: string | null;
+            /** Format: date-time */
+            timestamp?: string;
+        };
+        ChatWebhookRequest: {
+            conversationId?: string | null;
+            message?: string | null;
         };
         CheckoutSessionResponse: {
             url?: string | null;

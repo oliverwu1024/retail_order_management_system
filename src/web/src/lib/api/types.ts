@@ -40,3 +40,6 @@ export type SalesReport = Schemas['SalesReportDto']
 
 export type SentimentSummary = Schemas['SentimentSummaryDto']
 export type ProductSentiment = Schemas['ProductSentimentDto']
+
+export type ChatTurn = Schemas['ChatTurnDto']
+export type ChatWebhookRequest = Schemas['ChatWebhookRequest']

@@ -2,6 +2,7 @@ import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useSessionActions } from '@/features/auth/useSessionActions'
 import { useCartQuery } from '@/features/cart/hooks/useCartQuery'
+import { ChatDrawer } from '@/features/support/components/ChatDrawer'
 import { apiClient } from '@/lib/api/client'
 import { ADMIN_AREA_ROLES } from '@/lib/auth/roleSets'
 import { useAuthStore } from '@/lib/store/auth-store'
@@ -77,6 +78,8 @@ export function StorefrontShell() {
       <main className="mx-auto max-w-6xl px-4 py-8">
         <Outlet />
       </main>
+      {/* Support chatbot — storefront-only (AdminShell is a sibling layout), logged-in customers only. */}
+      {!isLoading && isCustomer ? <ChatDrawer /> : null}
     </div>
   )
 }
