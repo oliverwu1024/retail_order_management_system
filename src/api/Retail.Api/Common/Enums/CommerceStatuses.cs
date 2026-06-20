@@ -157,3 +157,33 @@ public enum SentimentLabel : byte
     /// <summary>Contains both positive and negative sentiment.</summary>
     Mixed = 4,
 }
+
+/// <summary>
+/// Author of a single <c>ChatMessage</c> in a support-chat session (Phase 5A),
+/// per DATABASE_DESIGN §3.21. Byte-backed → <c>tinyint</c>, explicit 1-based
+/// values (stored + serialized contract — never renumber).
+/// </summary>
+/// <remarks>
+/// IMPORTANT — this is a PERSISTENCE/DIAGNOSTICS label, NOT the Anthropic wire
+/// role. The Messages API has only <c>user</c> and <c>assistant</c> roles: a
+/// <c>tool_result</c> rides an Anthropic <em>user</em> message and a
+/// <c>tool_use</c> rides an <em>assistant</em> message. We persist a richer set so
+/// the admin diagnostics viewer can distinguish a plain user/assistant turn from a
+/// <see cref="Tool"/> row (a recorded tool call/result) and a <see cref="System"/>
+/// turn. The provider-facing contract (<c>LlmRole</c> = User/Assistant only) is
+/// unchanged; the mapping from these rows to wire roles happens in ChatService.
+/// </remarks>
+public enum ChatMessageRole : byte
+{
+    /// <summary>A turn typed by the customer.</summary>
+    User = 1,
+
+    /// <summary>A turn produced by Claude (assistant text).</summary>
+    Assistant = 2,
+
+    /// <summary>A system/context turn (e.g. the RAG-lite preamble), if persisted.</summary>
+    System = 3,
+
+    /// <summary>A recorded tool call/result (<c>ToolName</c> + <c>ToolPayloadJson</c> set).</summary>
+    Tool = 4,
+}

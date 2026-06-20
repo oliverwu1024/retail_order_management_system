@@ -120,6 +120,13 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Customer product reviews (member-only). Soft-deletable; sentiment scored asynchronously.</summary>
     public DbSet<Review> Reviews => Set<Review>();
 
+    // ── Support chat (Phase 5A) ──────────────────────────────────────────────
+    /// <summary>Customer support-chat conversations (append-only; upserted by ConversationId).</summary>
+    public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
+
+    /// <summary>Individual chat turns (user/assistant/system/tool). Append-only.</summary>
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.
