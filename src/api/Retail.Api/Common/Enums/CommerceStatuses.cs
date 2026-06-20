@@ -171,7 +171,9 @@ public enum SentimentLabel : byte
 /// the admin diagnostics viewer can distinguish a plain user/assistant turn from a
 /// <see cref="Tool"/> row (a recorded tool call/result) and a <see cref="System"/>
 /// turn. The provider-facing contract (<c>LlmRole</c> = User/Assistant only) is
-/// unchanged; the mapping from these rows to wire roles happens in ChatService.
+/// unchanged. Only <see cref="User"/>/<see cref="Assistant"/> text rows are replayed to the model as
+/// the transcript; <see cref="Tool"/>/<see cref="System"/> rows are diagnostics-only and never sent
+/// on the wire (the live tool_use/tool_result blocks come from the in-flight completion, not these rows).
 /// </remarks>
 public enum ChatMessageRole : byte
 {

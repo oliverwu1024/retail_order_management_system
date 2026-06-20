@@ -17,7 +17,8 @@ namespace Retail.Api.Services;
 /// <see cref="ILlmClient"/> seam. Each call: resolve + upsert the session (owner-checked), persist the
 /// user turn, build the request (system prompt + RAG-lite recent-orders block + tool definitions),
 /// then loop — call Claude, execute any tools it requests (owner-scoped), feed the results back —
-/// until the model finishes or the turn cap is hit. The whole conversation is one SQL transaction.
+/// until the model finishes or the turn cap is hit. A new session is persisted first (race-safe);
+/// the turn's messages then save together in a second <c>SaveChanges</c>.
 /// </summary>
 public sealed class ChatService : IChatService
 {
@@ -146,7 +147,8 @@ public sealed class ChatService : IChatService
         catch (ExternalServiceException ex)
         {
             // AI outage: degrade gracefully INSIDE the conversation (HTTP 200 + friendly text), never
-            // a 503. We persist the user turn but no assistant turn, so a retry resumes cleanly.
+            // a 503. We persist the user turn but no assistant turn; the next turn's history then has
+            // two consecutive user turns, which Anthropic merges (same-role messages collapse) — benign.
             _logger.LogWarning(ex, "Chat LLM call failed; returning a friendly fallback for user {UserId}.", appUserId);
             reply = FailureReply;
         }

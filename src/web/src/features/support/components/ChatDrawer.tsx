@@ -100,6 +100,8 @@ export function ChatDrawer() {
         onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-40 rounded-full shadow-lg"
         aria-label="Open support chat"
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
         Need help?
       </Button>

@@ -46,18 +46,21 @@ public sealed class ChatDemoSeeder
         _db.CustomerProfiles.Add(profile); // profile.Id is assigned now (client-generated GUID key)
 
         DateTimeOffset now = _clock.GetUtcNow();
-        foreach ((string _, DemoMessage[] messages) in Conversations)
+        for (int i = 0; i < Conversations.Length; i++)
         {
+            // Stagger StartedAt/LastMessageAt per session so the diagnostics list (ordered by
+            // LastMessageAt) is deterministic rather than tied on one shared timestamp.
+            DateTimeOffset startedAt = now.AddMinutes(-(Conversations.Length - i) * 5);
             var session = new ChatSession
             {
                 CustomerProfileId = profile.Id,
                 ConversationId = Guid.NewGuid().ToString(),
-                StartedAt = now,
-                LastMessageAt = now,
+                StartedAt = startedAt,
+                LastMessageAt = startedAt.AddMinutes(2),
             };
             _db.ChatSessions.Add(session);
 
-            foreach (DemoMessage m in messages)
+            foreach (DemoMessage m in Conversations[i].Messages)
             {
                 _db.ChatMessages.Add(new ChatMessage
                 {
