@@ -287,6 +287,7 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IdentityDataSeeder>();
     builder.Services.AddScoped<ReviewDemoSeeder>();
+    builder.Services.AddScoped<ChatDemoSeeder>();
 
     // ── Catalog services (Story 1.2) ─────────────────────────────────────────
     builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -654,8 +655,9 @@ try
         {
             IdentityDataSeeder seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
             await seeder.SeedAsync();
-            // Development-only demo reviews (idempotent, no-op outside Development).
+            // Development-only demo reviews + chat sessions (idempotent, no-op outside Development).
             await scope.ServiceProvider.GetRequiredService<ReviewDemoSeeder>().SeedAsync();
+            await scope.ServiceProvider.GetRequiredService<ChatDemoSeeder>().SeedAsync();
         }
         catch (Exception seedException)
         {

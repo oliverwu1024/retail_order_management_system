@@ -593,7 +593,8 @@ Per-phase migrations:
 | 2 | `0002_orders` | Cart, CartItem, InventoryReservation, Order, OrderLine, Payment, ProcessedStripeEvent, Shipment |
 | 3 | `0003_audit` | AuditLog table + supporting indexes |
 | 4 | `0009_reviews_sentiment` | Review table (Rating, Body, SentimentScore, SentimentLabel, ProcessedAt, IsDeleted) + `IX_Review_ProductId_CreatedAt` + filtered-unique `UX_Review_ProductId_CustomerProfileId`. **As-built the physical file is `<ts>_0009_reviews_sentiment`** — this column is the design-table label; the on-disk migration sequence is monotonic, and `0004` is already `0004_orders`. |
-| 5 | `0005_chat_forecast_anomaly` | ChatSession, ChatMessage, DemandForecast, ReorderHint, OrderAnomaly |
+| 5A | `0010_chat_sessions` | ChatSession, ChatMessage (+ unique `UX_ChatSession_ConversationId`, `IX_ChatSession_CustomerProfileId_LastMessageAt`, `IX_ChatMessage_ChatSessionId_CreatedAt`). **As-built:** Phase 5 was split into **5A (chatbot)** + **5B (forecasting + anomaly)**, so the chat tables shipped on their own as the physical file `<ts>_0010_chat_sessions` — the design label `0005_chat_forecast_anomaly` is superseded (`0005` is already `0005_checkout_idempotency`; the on-disk sequence is monotonic). |
+| 5B | `0011_forecast_anomaly` (planned) | DemandForecast, ReorderHint, OrderAnomaly |
 | 7 | `0006a_order_breakdown` | OrderPriceBreakdown (1:1 Order) |
 | 7 | `0006b_vouchers` | Voucher, VoucherRedemption |
 | 7 | `0006c_loyalty` | LoyaltyAccount, LoyaltyTransaction |

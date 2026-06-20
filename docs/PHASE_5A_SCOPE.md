@@ -365,7 +365,7 @@ Functions) and Phase 8, not here. 5A's payoff is the **B-1 component** + the
 - **Copilot Studio (HMAC) caller** — Phase 6 stretch; the webhook contract is built to serve it with a second auth arm.
 - **Post-delivery returns / RMA entity** — out (no domain support); revisit only if a bullet needs it.
 - **CSRF exemption is a path-prefix (`StartsWithSegments`) check** — when the Phase-6 Copilot/HMAC arm is added, give it its own HMAC-validated path so it does **not** inherit the Stripe exemption.
-- **Fold `0010_chat_sessions` + the split into DATABASE_DESIGN §5** at the C4 docs pass; 5B will add `0011_forecast_anomaly`.
+- ~~**Fold `0010_chat_sessions` + the split into DATABASE_DESIGN §5**~~ — ✅ done in C4 (DATABASE_DESIGN §5 rows 5A/5B); §8 naming + other deltas reconciled in §19. 5B will add `0011_forecast_anomaly`.
 
 ## 18. Known limitations (5A)
 
@@ -374,3 +374,17 @@ Functions) and Phase 8, not here. 5A's payoff is the **B-1 component** + the
 - **Conversation memory is per-`ConversationId`:** history is reloaded from SQL each turn; there is no summarization/truncation of very long sessions in 5A (cap message count fed to the model if needed — flagged, not built).
 - **`start_return` is Paid-only:** post-delivery returns are out (no RMA entity); the tool returns an honest ineligible proposal for Fulfilled orders.
 - **Transcript PII:** `ChatSession`/`ChatMessage` persist full conversations + tool payloads (order detail) with no retention limit — a long-lived PII store whose only access control is the `Chat.View` admin gate. Retention/erasure + tool-payload redaction are **not** modeled in 5A (flag for a later data-retention pass alongside Phase-9 observability/runbooks).
+
+## 19. As-built reconciliation (C0–C4)
+
+Phase 5A shipped C0–C4 (all on `main`, CI green: C0 `e465dc8`, C1 `2d0bdfc`, C2 `d21fa28`, C3 `ba703ce`). Deltas from this scope's pre-build plan, recorded here rather than silently absorbed:
+
+- **Migration split.** Phase 5 was split into **5A (chatbot)** + **5B (forecasting + anomaly)**, so the chat tables shipped on their own as the physical file **`0010_chat_sessions`** (not the design label `0005_chat_forecast_anomaly`; `0005` is already `0005_checkout_idempotency`). DATABASE_DESIGN §5 now reflects this (5A `0010_chat_sessions`, 5B `0011_forecast_anomaly` planned).
+- **Tool registry/dispatcher naming.** §8 named `ChatToolRegistry` / `IChatToolDispatcher`; the as-built equivalents are **`ChatTools`** (static `LlmTool[]` catalogue) + **`IChatToolExecutor`/`ChatToolExecutor`** (the owner-scoped dispatcher). Functionally identical; clearer names.
+- **`ChatToolResult` seam (C3).** The executor returns **`ChatToolResult(Content, ProposedAction?)`**, not a bare string — so a confirmation-gated tool (`start_return`) can surface a `ChatProposedAction` that `ChatService` threads (reset per tool round → last-round-wins) onto `ChatTurnDto.ProposedAction`. `ChatTurnDto` gained the optional `ProposedAction` in C3 (Reply-only in C1/C2, as planned).
+- **`start_return` landed in C3, not C1.** Per the chunking, C1 shipped read-only tools + the 2 Phase-7 stubs; `start_return` (proposal-only, Paid-only, owner-scoped) + its `ConfirmReturnCard` are C3. The confirm reuses the existing customer cancel endpoint `POST /api/v1/orders/{id}/cancel` — no new money path.
+- **Admin RBAC = new `Chat.View` policy ({StoreManager, Administrator}).** Flipped from the doc's earlier Administrator-only intent during the scope review, to honour the REQUIREMENTS matrix + mirror `Sentiment.View` (§3.8). FE mirror: `ROLE_SETS.chat`.
+- **Diagnostics routes (§4 row 9).** `GET /api/v1/chat/sessions` (paged list) + `GET /api/v1/chat/sessions/{id}` (history), not PLAN's `/sessions/{id}/history`. The DbContext-direct `ChatQueryService` mirrors `AuditQueryService`; transcript history is ordered User→Tool→Assistant in memory (a single SaveChanges stamps one `CreatedAt` across the turn).
+- **FE confirm flow.** `ConfirmReturnCard` is presentational; the `useCancelOrder` mutation is owned by `ChatDrawer` (so a refund can't silently complete if the customer sends a new turn mid-cancel, and the composer locks while confirming) — a C3-review hardening.
+- **Dev demo seed.** `ChatDemoSeeder` (Development-only, idempotent) seeds 2 demo chat sessions so the admin diagnostics page shows data on first run.
+- **Tests as-built.** ~28 chat-focused tests across the chunks (chat-webhook + tool-executor + diagnostics integration; `AnthropicLlmClient` wire serialization + `ChatService` loop/failure/proposal unit; storefront drawer + confirm-card + admin-page + role-set Vitest) — backend 250 + web 48 green, stub-mode CI, 85% coverage gate held.
