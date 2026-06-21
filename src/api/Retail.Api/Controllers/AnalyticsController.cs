@@ -10,20 +10,48 @@ using Retail.Api.Services;
 namespace Retail.Api.Controllers;
 
 /// <summary>
-/// Reporting (Phase 3 §9). Requires the <c>Reports.View</c> policy (Staff + StoreManager +
-/// Administrator, view-only).
+/// Reporting + the order-anomaly Risk Queue (Phase 3 §9 / Phase 5B §7). Reports are <c>Reports.View</c>
+/// (view-only); the Risk Queue read + acknowledge are <c>Anomaly.Manage</c> (Staff + StoreManager +
+/// Administrator).
 /// </summary>
 [ApiController]
 [Route("api/v1/analytics")]
 public sealed class AnalyticsController : ControllerBase
 {
     private readonly IReportQueryService _reports;
+    private readonly IOrderAnomalyService _anomalies;
     private readonly TimeProvider _timeProvider;
 
-    public AnalyticsController(IReportQueryService reports, TimeProvider timeProvider)
+    public AnalyticsController(IReportQueryService reports, IOrderAnomalyService anomalies, TimeProvider timeProvider)
     {
         _reports = reports;
+        _anomalies = anomalies;
         _timeProvider = timeProvider;
+    }
+
+    /// <summary>Order-anomaly Risk Queue: unacknowledged flagged orders, newest first, paged. Staff+.</summary>
+    [HttpGet("anomalies")]
+    [Authorize(Policy = Roles.Policies.AnomalyManage)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<AnomalyDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Anomalies([FromQuery] RiskQueueQuery query, CancellationToken ct)
+    {
+        PagedResult<AnomalyDto> result = await _reports.GetRiskQueueAsync(query.Page, query.PageSize, ct);
+        return Ok(ApiResponse<PagedResult<AnomalyDto>>.Ok(result));
+    }
+
+    /// <summary>Acknowledge a flagged order so it can ship (clears the Mark-Shipped block). Staff+.</summary>
+    [HttpPost("anomalies/{id:guid}/acknowledge")]
+    [Authorize(Policy = Roles.Policies.AnomalyManage)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AcknowledgeAnomaly(Guid id, CancellationToken ct)
+    {
+        await _anomalies.AcknowledgeAsync(id, ct);
+        return Ok(ApiResponse<object?>.Ok(null));
     }
 
     /// <summary>Sales grouped by day (+ a category breakdown). Defaults to the last 30 days.</summary>

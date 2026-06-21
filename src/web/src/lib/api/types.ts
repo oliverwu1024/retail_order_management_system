@@ -47,3 +47,6 @@ export type ChatProposedAction = Schemas['ChatProposedAction']
 export type ChatSession = Schemas['ChatSessionDto']
 export type ChatSessionDetail = Schemas['ChatSessionDetailDto']
 export type ChatSessionPage = Schemas['ChatSessionDtoPagedResult']
+
+export type Anomaly = Schemas['AnomalyDto']
+export type AnomalyPage = Schemas['AnomalyDtoPagedResult']

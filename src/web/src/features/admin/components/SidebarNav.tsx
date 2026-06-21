@@ -13,6 +13,7 @@ interface NavItem {
 const ITEMS: NavItem[] = [
   { to: '/admin', label: 'Dashboard' },
   { to: '/admin/orders', label: 'Orders', area: 'orders' },
+  { to: '/admin/risk', label: 'Risk queue', area: 'risk' },
   { to: '/admin/products', label: 'Products', area: 'catalog' },
   { to: '/admin/inventory', label: 'Inventory', area: 'inventory' },
   { to: '/admin/audit', label: 'Audit log', area: 'audit' },

@@ -20,4 +20,10 @@ public interface IOrderAnomalyService
     /// already flagged.
     /// </summary>
     Task EvaluateOrderAsync(Guid orderId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Acknowledges a flagged order from the Risk Queue (Staff/StoreManager), clearing the Mark-Shipped
+    /// block. Idempotent. Throws <c>NotFoundException</c> if the anomaly id doesn't exist.
+    /// </summary>
+    Task AcknowledgeAsync(Guid anomalyId, CancellationToken ct = default);
 }

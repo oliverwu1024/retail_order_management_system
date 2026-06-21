@@ -171,6 +171,10 @@ public sealed class OrderRepository : IOrderRepository
         await _db.Orders.Include(o => o.Shipment).FirstOrDefaultAsync(o => o.Id == orderId, ct);
 
     /// <inheritdoc />
+    public async Task<bool> HasUnacknowledgedAnomalyAsync(Guid orderId, CancellationToken ct) =>
+        await _db.OrderAnomalies.AsNoTracking().AnyAsync(a => a.OrderId == orderId && !a.Acknowledged, ct);
+
+    /// <inheritdoc />
     public async Task<bool> TryClaimForRefundByIdAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct)
     {
         // Same optimistic claim as TryClaimForRefundAsync but admin-scoped (no owner filter). Paid

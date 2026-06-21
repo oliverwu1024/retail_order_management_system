@@ -18,6 +18,8 @@ export const ROLE_SETS = {
   sentiment: ['StoreManager', 'Administrator'],
   // Chat-session diagnostics — StoreManager + Administrator (Staff excluded), mirrors Chat.View.
   chat: ['StoreManager', 'Administrator'],
+  // Order-anomaly Risk Queue — Staff + StoreManager + Administrator (Staff CAN process it), mirrors Anomaly.Manage.
+  risk: ['Staff', 'StoreManager', 'Administrator'],
   // Capability (not a sidebar area): who may issue a refund — mirrors Orders.Refund.
   refund: ['StoreManager', 'Administrator'],
 } satisfies Record<string, string[]>

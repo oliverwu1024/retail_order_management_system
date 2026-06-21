@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Retail.Api.Common.Enums;
+using Retail.Api.Common.Models;
 using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
 using Retail.Api.DTOs.Responses;
@@ -27,6 +28,27 @@ public sealed class ReportQueryService : IReportQueryService
     {
         _db = db;
         _timeProvider = timeProvider;
+    }
+
+    /// <inheritdoc />
+    public async Task<PagedResult<AnomalyDto>> GetRiskQueueAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        // Only unacknowledged flags are "in the queue" — acknowledging removes an order from it.
+        IQueryable<OrderAnomaly> query = _db.OrderAnomalies.AsNoTracking().Where(a => !a.Acknowledged);
+        int total = await query.CountAsync(ct);
+
+        List<AnomalyDto> items = await query
+            .OrderByDescending(a => a.DetectedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new AnomalyDto(
+                a.Id, a.OrderId, a.Order.OrderNumber, a.Score, a.Reason, a.DetectedAt, a.Acknowledged))
+            .ToListAsync(ct);
+
+        return new PagedResult<AnomalyDto>(items, total, page, pageSize);
     }
 
     /// <inheritdoc />

@@ -12,6 +12,7 @@ import { AdminProductsPage } from '@/features/admin/AdminProductsPage'
 import { AuditLogPage } from '@/features/admin/AuditLogPage'
 import { ProductFormPage } from '@/features/admin/ProductFormPage'
 import { ReportsPage } from '@/features/admin/ReportsPage'
+import { RiskQueuePage } from '@/features/admin/RiskQueuePage'
 import { UsersPage } from '@/features/admin/UsersPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
@@ -100,6 +101,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGuard allowedRoles={ROLE_SETS.orders}>
             <AdminOrderDetailPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: 'risk',
+        element: (
+          <RoleGuard allowedRoles={ROLE_SETS.risk}>
+            <RiskQueuePage />
           </RoleGuard>
         ),
       },

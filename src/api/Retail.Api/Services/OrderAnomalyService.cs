@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Retail.Api.Common.Enums;
 using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
+using Retail.Api.Exceptions;
 using Retail.Ml.Anomaly;
 
 namespace Retail.Api.Services;
@@ -133,6 +134,20 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
             _db.OrderAnomalies.Add(row);
             await _db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task AcknowledgeAsync(Guid anomalyId, CancellationToken ct = default)
+    {
+        OrderAnomaly anomaly = await _db.OrderAnomalies.FirstOrDefaultAsync(a => a.Id == anomalyId, ct)
+            ?? throw new NotFoundException($"Anomaly '{anomalyId}' was not found.");
+        if (anomaly.Acknowledged)
+        {
+            return; // idempotent
+        }
+
+        anomaly.Acknowledged = true; // UpdatedBy/UpdatedAt are stamped by the AuditingInterceptor
+        await _db.SaveChangesAsync(ct);
     }
 
     // The pure rule evaluation — returns a row to write, or null if the order is clean.

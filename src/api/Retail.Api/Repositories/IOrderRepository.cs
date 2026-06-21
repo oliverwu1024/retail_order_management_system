@@ -54,6 +54,13 @@ public interface IOrderRepository
     /// <summary>Tracked order (with its shipment) for fulfilment writes (mark shipped / delivered).</summary>
     Task<Order?> GetTrackedWithShipmentAsync(Guid orderId, CancellationToken ct);
 
+    /// <summary>
+    /// Whether the order has an UNACKNOWLEDGED anomaly flag — the Mark-Shipped guard (Phase 5B §7). A
+    /// direct query, not a loaded nav: the fulfilment load (<see cref="GetTrackedWithShipmentAsync"/>)
+    /// includes only the shipment.
+    /// </summary>
+    Task<bool> HasUnacknowledgedAnomalyAsync(Guid orderId, CancellationToken ct);
+
     /// <summary>Admin refund claim: atomically flip {Paid, Fulfilled} → Refunding (NOT owner-scoped). True if won.</summary>
     Task<bool> TryClaimForRefundByIdAsync(Guid orderId, DateTimeOffset now, string actor, CancellationToken ct);
 

@@ -22,6 +22,7 @@ public sealed class AdminOrderService : IAdminOrderService
     private readonly IAuditWriter _audit;
     private readonly IStripeRefundGateway _refundGateway;
     private readonly IOrderRefundService _orderRefund;
+    private readonly IOrderAnomalyService _anomalies;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly TimeProvider _timeProvider;
 
@@ -30,6 +31,7 @@ public sealed class AdminOrderService : IAdminOrderService
         IAuditWriter audit,
         IStripeRefundGateway refundGateway,
         IOrderRefundService orderRefund,
+        IOrderAnomalyService anomalies,
         ICurrentUserAccessor currentUser,
         TimeProvider timeProvider)
     {
@@ -37,6 +39,7 @@ public sealed class AdminOrderService : IAdminOrderService
         _audit = audit;
         _refundGateway = refundGateway;
         _orderRefund = orderRefund;
+        _anomalies = anomalies;
         _currentUser = currentUser;
         _timeProvider = timeProvider;
     }
@@ -74,6 +77,16 @@ public sealed class AdminOrderService : IAdminOrderService
         if (order.Shipment is not null)
         {
             throw new ConflictException($"Order #{order.OrderNumber} already has a shipment.");
+        }
+
+        // Anomaly gate (Phase 5B / REQUIREMENTS §10.2): a flagged order can't ship until acknowledged.
+        // Evaluate on the spot if the 15-min scan hasn't reached it yet, so a just-placed order can't
+        // slip through; the check is a direct query (the fulfilment load doesn't include anomalies).
+        await _anomalies.EvaluateOrderAsync(orderId, ct);
+        if (await _orders.HasUnacknowledgedAnomalyAsync(orderId, ct))
+        {
+            throw new ConflictException(
+                $"Order #{order.OrderNumber} is flagged for review — acknowledge it in the Risk Queue before shipping.");
         }
 
         // Tracked write: creating the shipment + flipping Paid → Fulfilled in one SaveChanges. The
