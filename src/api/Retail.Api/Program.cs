@@ -290,6 +290,7 @@ try
     builder.Services.AddScoped<IdentityDataSeeder>();
     builder.Services.AddScoped<ReviewDemoSeeder>();
     builder.Services.AddScoped<ChatDemoSeeder>();
+    builder.Services.AddScoped<OrderDemoSeeder>();
 
     // ── Catalog services (Story 1.2) ─────────────────────────────────────────
     builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -670,6 +671,7 @@ try
             // Development-only demo reviews + chat sessions (idempotent, no-op outside Development).
             await scope.ServiceProvider.GetRequiredService<ReviewDemoSeeder>().SeedAsync();
             await scope.ServiceProvider.GetRequiredService<ChatDemoSeeder>().SeedAsync();
+            await scope.ServiceProvider.GetRequiredService<OrderDemoSeeder>().SeedAsync();
         }
         catch (Exception seedException)
         {
