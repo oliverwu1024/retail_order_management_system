@@ -127,6 +127,10 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>Individual chat turns (user/assistant/system/tool). Append-only.</summary>
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
+    // ── Order-anomaly detection (Phase 5B) ───────────────────────────────────
+    /// <summary>System-generated risk flags on orders (one per flagged order). Gates Mark-Shipped until acknowledged.</summary>
+    public DbSet<OrderAnomaly> OrderAnomalies => Set<OrderAnomaly>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.

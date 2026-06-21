@@ -98,6 +98,14 @@ public static class Roles
         /// </summary>
         public const string ChatView = "Chat.View";
 
+        /// <summary>
+        /// Manage the order-anomaly Risk Queue (view + acknowledge). Staff + StoreManager +
+        /// Administrator — Staff CAN process the risk queue (REQUIREMENTS §10.2 matrix:
+        /// 处理风险队列/订单异常 = Staff ✅), unlike <see cref="SentimentView"/>/<see cref="ChatView"/>
+        /// which are SM+. Phase 5B.
+        /// </summary>
+        public const string AnomalyManage = "Anomaly.Manage";
+
         /// <summary>Create/list Staff accounts. StoreManager + Administrator.</summary>
         public const string UsersManageStaff = "Users.ManageStaff";
 

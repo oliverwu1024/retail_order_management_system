@@ -266,6 +266,7 @@ try
         options.AddPolicy(Roles.Policies.InventoryAdjust, p => p.RequireRole(staffPlus));
         options.AddPolicy(Roles.Policies.AuditView, p => p.RequireRole(staffPlus));
         options.AddPolicy(Roles.Policies.ReportsView, p => p.RequireRole(staffPlus));
+        options.AddPolicy(Roles.Policies.AnomalyManage, p => p.RequireRole(staffPlus));
 
         options.AddPolicy(Roles.Policies.OrdersRefund, p => p.RequireRole(managerPlus));
         options.AddPolicy(Roles.Policies.UsersManageStaff, p => p.RequireRole(managerPlus));
