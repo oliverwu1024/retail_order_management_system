@@ -294,3 +294,32 @@ correctness/RBAC talking point), and testing/CI (keyless, deterministic).
 - **Seeder audit noise:** the dev seeder inserts real `Order`/`Payment` rows, which the `AuditTrailInterceptor` records — accepted dev-only noise (the seeder is never run outside Development).
 - **Guest baseline:** guest orders (no profile/history) fall to the **global** rule-1 baseline and skip rule 2 (no prior orders) — they have no per-customer history (§4 row 4).
 - **Acknowledge-vs-ship TOCTOU:** the ship guard's anomaly check + the Paid→Fulfilled SaveChanges aren't one transaction with a concurrent acknowledge, so the two could interleave. The order's `RowVersion` guards the status transition but not the anomaly row; at portfolio scale (a single operator) this is benign — documented, not closed.
+
+## 18. As-built reconciliation (shipped C0–C4)
+
+Built across five commits on `main` (C0 data model → C1 seeder → C2 engine → C3 risk queue/ship-block
+→ C4 docs), each reviewed + CI-green. Deltas from the plan above:
+
+- **Migration `0011_order_anomaly`** (anomaly table only); forecasting → `0012_demand_forecast` later.
+  DATABASE_DESIGN §5 updated to the two-row split. ADR-0003 **amended** (the PLAN-§8d batch-scan as-built
+  supersedes its `CustomerSpendingBaseline` fraud design; the shared scorer landed at
+  `Retail.Ml/Anomaly/ZScoreScorer.cs`, not `Retail.Ml/Fraud/`).
+- **Engine (C2):** `ZScoreScorer` (pure, population-σ, log-Z, σ-guard) + `OrderAnomalyService`
+  (`ScanAsync` batch + `EvaluateOrderAsync` single) computing the per-customer rules **in memory**
+  (country lives in `ShippingAddressJson`). One row per flagged order; `Score` = `|Z|` or 0.
+- **Hosted service scans IMMEDIATELY on startup** (do-while), so the Risk Queue populates on a
+  boot/deploy — which made the **Testing-environment registration gate required** (not the "optional"
+  of §14): an immediate scan would otherwise flag other integration tests' orders.
+- **Seeder tuning (caught on the first dev run):** the injected Z-anomaly wasn't `> 3σ` against the
+  *wide* original baseline once log-transformed (engine correct, seed under-sized). Fixed in C1's
+  seeder — normals tightened to 1–2 lines × qty 1–2, the anomaly enlarged to every variant × qty 5 —
+  and locked by an `EvaluateOrder_BigTotalAgainstWideBaseline` test.
+- **Acknowledge** returns `200` + an `ApiResponse` envelope (not `204`), matching the codebase's
+  envelope convention.
+- **Workbench "Flagged" badge DEFERRED** (needs `AdminOrderSummary/Detail` DTO + a list join) — folds
+  with the §16 order-list has-anomaly filter; the ship-block 409 + the Risk Queue already surface
+  anomalies, so the feature is complete without it.
+- **Tests (all hermetic, keyless):** `ZScoreScorerTests` (5 unit) · `OrderAnomalyServiceTests` (8
+  integration, driven via `EvaluateOrderAsync` scoped to each test's own order) · `RiskQueueTests` (9
+  integration: RBAC/list/acknowledge/ship-block) · `RiskQueuePage` (2 Vitest). The cross-phase
+  ship-block edit broke no existing fulfilment test.

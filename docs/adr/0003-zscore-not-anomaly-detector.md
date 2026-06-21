@@ -1,6 +1,6 @@
 # ADR-0003: Z-Score for Fraud Scoring — Not Azure Anomaly Detector
 
-**Status**: Accepted (2026-06-06)
+**Status**: Accepted (2026-06-06); **amended 2026-06-21** for the Phase-5B order-anomaly as-built (see the Amendment at the end).
 
 **Deciders**: project owner
 
@@ -88,3 +88,33 @@ Implement fraud scoring as a **per-customer Z-score on transaction amount**, wit
 - **A fraud pattern emerges that the amount-only score cannot catch** (e.g. many small transactions in short succession). → Add per-feature Z-scores; combine via max or weighted sum.
 - **A first-party Microsoft or ML.NET anomaly trainer with strong defaults and good documentation ships** and is not deprecated. → Re-evaluate; Z-score's resume story remains intact whether we keep or replace it.
 - **A non-portfolio version of this project goes to production** with regulatory or audit requirements (PCI, AML). → Replace with a proper fraud platform (Stripe Radar, third-party); Z-score is illustrative, not certifiable.
+
+---
+
+## Amendment (2026-06-21) — Order-anomaly detection as-built (Phase 5B)
+
+Phase 5 was split; Phase 5B ships **order-anomaly detection** (REQUIREMENTS §10) — a sibling of the
+fraud scoring this ADR describes. It **adopts the core decision above** (a Z-score on a log transform,
+with the `σ == 0` / `σ < 1e-6` numerical-safety guard, and no Azure Anomaly Detector) but the
+*delivery mechanism* is deliberately lighter than the fraud design in **Decision** / **Implementation
+notes**. As-built:
+
+- **Shared scorer, new home.** The pure scorer is `Retail.Ml/Anomaly/ZScoreScorer.cs`
+  (`Score(value, sample)` → log-Z with the σ-guard), **not** `Retail.Ml/Fraud/`. It is the first real
+  code in `Retail.Ml` and is reusable by the future fraud scorer.
+- **No `CustomerSpendingBaseline` table, no nightly trainer.** A 15-minute `OrderAnomalyHostedService`
+  computes each buyer's mean/σ **on the fly** from their recent paid orders (last ~50; `< 5` prior → a
+  **global** baseline, in place of the loyalty-tier cohort). The baseline-rebuild Function is not built
+  for order-anomaly.
+- **Batch, not synchronous-at-checkout.** Detection is a recurring background scan over recent paid
+  orders, plus an **evaluate-on-ship** guard — not an inline step in order placement.
+- **Three rules, not amount-only.** Besides the amount Z-score it flags a never-seen shipping country
+  and a per-line quantity spike (REQUIREMENTS §10.1).
+- **No `Mode` flag.** Order-anomaly is pure in-process math with no external dependency, so there is no
+  `stub` mode (unlike `Fraud:Mode = stub` above, or the Phase-4 sentiment adapter).
+- **Output + action.** One `OrderAnomaly` row per flagged order → a back-office **Risk Queue**; a
+  flagged, unacknowledged order is **blocked from Mark-Shipped** until acknowledged (REQUIREMENTS §10.2).
+
+The original fraud design (per-customer `CustomerSpendingBaseline` + nightly trainer + synchronous
+scoring at checkout, with soft/hard thresholds and loyalty-tier cohorts) **remains the plan for the
+dedicated fraud-scoring feature**, which is not built in Phase 5B. See PHASE_5B_SCOPE §3.2 / §18.
