@@ -37,6 +37,7 @@ export function RiskQueuePage() {
         <Button
           variant="outline"
           size="sm"
+          aria-label={`Acknowledge order #${row.orderNumber ?? ''}`}
           disabled={acknowledge.isPending || !row.id}
           onClick={() => row.id && acknowledge.mutate(row.id)}
         >
@@ -57,7 +58,7 @@ export function RiskQueuePage() {
       </div>
 
       {acknowledge.isError ? (
-        <p className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           Couldn’t acknowledge that order. Please try again.
         </p>
       ) : null}

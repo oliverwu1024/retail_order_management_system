@@ -44,7 +44,7 @@ which the order ships normally.
 - **Risk Queue read + Acknowledge write**: `GET /api/v1/analytics/anomalies` (paged, unacknowledged-first) + `POST /api/v1/analytics/anomalies/{id}/acknowledge`, both gated by a **new `Anomaly.Manage` policy** (Staff + StoreManager + Administrator — §3.6 / §12).
 - **Mark-Shipped block**: the existing Phase-3 fulfilment ship path rejects an order that has an **unacknowledged** `OrderAnomaly` — **evaluating the order on the spot** if the 15-min scan hasn't reached it yet, so the block can't be timing-bypassed (a guarded, tested edit into shipped code — §3.5).
 - **Development-only 6-month synthetic order seeder** (`OrderDemoSeeder`) — deterministic (seeded `Random`), seasonality + weekly cycle + trend, with a handful of injected anomalies; feeds the anomaly demo now and demand-forecasting later (§3.7).
-- **Storefront/admin FE**: an `/admin/risk` Risk Queue page (DataTable + Acknowledge action) + `SidebarNav` item + `ROLE_SETS.risk`; an anomaly badge on the admin order workbench.
+- **Storefront/admin FE**: an `/admin/risk` Risk Queue page (DataTable + Acknowledge action) + `SidebarNav` item + `ROLE_SETS.risk`. (A per-order "Flagged" **badge** on the admin order workbench was planned here but **deferred** as-built — see §16 / §18; the ship-block 409 + Risk Queue already surface anomalies.)
 - **Hermetic tests** (no Azure, no key): scorer unit tests (each rule + the σ-guard), anomaly-scan + ship-block + RBAC integration tests, Risk Queue Vitest.
 - **ADR-0003 amendment** reconciling the per-customer-baseline design to the shipped PLAN-§8d batch-scan (§3.2 / §4).
 
@@ -206,7 +206,7 @@ Standard `ApiResponse<T>` envelope; lists ride `PagedResult<T>`; `[FromQuery]` P
 
 - **`features/admin/RiskQueuePage.tsx`** at `/admin/risk`: `DataTable` over `GET /analytics/anomalies` (order #, reason, score, detected-at) → **Acknowledge** button per row (`useAcknowledgeAnomaly` mutation, invalidates the list); `EmptyState` when clear. Mirrors `AuditLogPage`.
 - **Gating:** new `ROLE_SETS.risk = ['Staff','StoreManager','Administrator']`; `SidebarNav` item "Risk queue" (area `risk`); `RoleGuard` on the route.
-- **Workbench badge:** the admin order detail/list shows a "Flagged" badge when an order has an unacknowledged anomaly; the Mark-Shipped button surfaces the 409 message.
+- **Workbench badge (DEFERRED as-built — §18):** ideally the admin order detail/list would show a "Flagged" badge when an order has an unacknowledged anomaly. Deferred (needs an `AdminOrderSummary/Detail` DTO field + a list join); the Mark-Shipped 409 + the Risk Queue cover the operational need.
 - `pnpm gen:api` + `lib/api/types.ts` aliases; **`pnpm format`** before push.
 
 ## 10. Authorization design
@@ -233,7 +233,7 @@ Standard `ApiResponse<T>` envelope; lists ride `PagedResult<T>`; `[FromQuery]` P
 - **C0 — Data model + policy.** `OrderAnomaly` entity + config + `Order.Anomalies` nav + `DbSet` + migration `0011_order_anomaly`; `Anomaly.Manage` policy. *Verify:* build 0/0, migration applies, indexes/FK present.
 - **C1 — Synthetic order seeder.** `OrderDemoSeeder` (Development-only, deterministic; reuses the seeded catalog; satisfies the OrderNumber / member-XOR-guest CHECK / `ShippingAddressJson` invariants — §3.7); registered **after** the catalog seeder, invoked at startup. *Verify:* dev boot seeds ~6 months of Paid orders incl. the planted anomalies; idempotent on re-run (sentinel guard).
 - **C2 — Anomaly engine.** `Retail.Ml/Anomaly/ZScoreScorer` (log-transform Z + σ-guard) + `OrderAnomalyService` (`ScanAsync` + `EvaluateOrderAsync`, in-memory per-customer rules, idempotent) + `OrderAnomalyHostedService` (15-min timer). *Verify (drive `ScanAsync` directly):* the planted anomalies flag; normal + first-ever orders don't; second scan is a no-op.
-- **C3 — Risk queue + acknowledge + ship block + FE.** `GET /analytics/anomalies` + acknowledge endpoint; the `MarkShippedAsync` evaluate-on-ship 409 guard (via `IOrderRepository.HasUnacknowledgedAnomalyAsync`); `/admin/risk` page + nav + `ROLE_SETS.risk` + workbench badge. *Verify:* flagged order blocks ship → acknowledge → ships; an un-scanned anomalous order 409s on ship; **existing ship tests still pass** (confirm none ship a qty > 5 line); risk queue renders + clears; RBAC.
+- **C3 — Risk queue + acknowledge + ship block + FE.** `GET /analytics/anomalies` + acknowledge endpoint; the `MarkShippedAsync` evaluate-on-ship 409 guard (via `IOrderRepository.HasUnacknowledgedAnomalyAsync`); `/admin/risk` page + nav + `ROLE_SETS.risk` (workbench badge deferred — §18). *Verify:* flagged order blocks ship → acknowledge → ships; an un-scanned anomalous order 409s on ship; **existing ship tests still pass** (confirm none ship a qty > 5 line); risk queue renders + clears; RBAC.
 - **C4 — Tests, docs.** The full test set (§12); amend ADR-0003 (PLAN-§8d batch-scan as-built); reconcile DATABASE_DESIGN §5 (rows `0011_order_anomaly` / `0012_demand_forecast`) + add §19 as-built. *Verify:* all green in keyless CI; coverage gate holds.
 
 ## 14. Testing interactions (revised after scope review)
@@ -284,7 +284,7 @@ correctness/RBAC talking point), and testing/CI (keyless, deterministic).
 - **`CustomerSpendingBaseline` table + nightly rebuild** — the heavier ADR-0003 design, deferred (on-the-fly mean/σ suffices now).
 - **Retro-scan window / `EvaluatedAt`** — if anomalies on older orders ever matter, add a watermark column (out now, §3.4).
 - **`OrderAnomalyScanFn` (Phase 8)** — the in-process service moves to a Function; the A-3 numbers are measured there.
-- **Order-list "has-anomaly" filter (REQUIREMENTS §4.2)** — the admin order workbench's filter-by-flagged option. The *badge* ships this phase (§9); the list **filter** is deferred to a Phase-3-workbench follow-up.
+- **Order-workbench anomaly surfacing (REQUIREMENTS §4.2)** — both the per-order **"Flagged" badge** and the order-list **filter-by-flagged** are deferred to a Phase-3-workbench follow-up (both need an `AdminOrderSummary/Detail` DTO field + a list join). The ship-block 409 + the dedicated Risk Queue cover the need this phase.
 - **Anomaly summary report (REQUIREMENTS §11.2, "异常汇总")** — a summary/trend report tile; deferred (the operational risk queue covers the immediate need).
 
 ## 17. Known limitations (5B anomaly)
@@ -294,6 +294,7 @@ correctness/RBAC talking point), and testing/CI (keyless, deterministic).
 - **Seeder audit noise:** the dev seeder inserts real `Order`/`Payment` rows, which the `AuditTrailInterceptor` records — accepted dev-only noise (the seeder is never run outside Development).
 - **Guest baseline:** guest orders (no profile/history) fall to the **global** rule-1 baseline and skip rule 2 (no prior orders) — they have no per-customer history (§4 row 4).
 - **Acknowledge-vs-ship TOCTOU:** the ship guard's anomaly check + the Paid→Fulfilled SaveChanges aren't one transaction with a concurrent acknowledge, so the two could interleave. The order's `RowVersion` guards the status transition but not the anomaly row; at portfolio scale (a single operator) this is benign — documented, not closed.
+- **Duplicate flag under true concurrency:** `OrderAnomaly` has **no unique index on `OrderId`**, and the scan / evaluate-on-ship inserts are check-then-insert on independent DbContext scopes. Two concurrent writers (a second app instance, or the 15-min scan racing an evaluate-on-ship in the same sub-second) could both pass the "no row" check and insert two rows for one order. Single-instance at portfolio scale this never occurs; the blast radius is cosmetic (a duplicate Risk-Queue row + acknowledging each), and the ship-block still holds while any row is unacknowledged. The durable fix — a `UNIQUE(OrderId)` index + swallow-the-duplicate-key + a per-order `ScanAsync` insert fallback — is deferred with the Phase-8 multi-instance / Function move (where it actually matters). Confirmed at the 5B-anomaly phase-end review (rated low).
 
 ## 18. As-built reconciliation (shipped C0–C4)
 

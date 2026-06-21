@@ -78,7 +78,7 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
                 .GroupBy(o => o.CustomerProfileId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-        IReadOnlyList<double> globalLogTotals = await LoadGlobalLogTotalsAsync(ct);
+        IReadOnlyList<(Guid Id, double Log)> globalLogTotals = await LoadGlobalLogTotalsAsync(ct);
 
         var newRows = new List<OrderAnomaly>();
         foreach (Order order in candidates)
@@ -126,7 +126,7 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
                 .ToListAsync(ct)
             : new List<Order>();
 
-        IReadOnlyList<double> globalLogTotals = await LoadGlobalLogTotalsAsync(ct);
+        IReadOnlyList<(Guid Id, double Log)> globalLogTotals = await LoadGlobalLogTotalsAsync(ct);
 
         OrderAnomaly? row = Evaluate(order, history, globalLogTotals, _clock.GetUtcNow());
         if (row is not null)
@@ -152,7 +152,7 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
 
     // The pure rule evaluation — returns a row to write, or null if the order is clean.
     private static OrderAnomaly? Evaluate(
-        Order order, IReadOnlyList<Order> history, IReadOnlyList<double> globalLogTotals, DateTimeOffset now)
+        Order order, IReadOnlyList<Order> history, IReadOnlyList<(Guid Id, double Log)> globalLogTotals, DateTimeOffset now)
     {
         var reasons = new List<string>(3);
         decimal score = 0;
@@ -160,21 +160,28 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
         // ── Rule 1: Z-score on log(total) over the buyer's prior paid orders ──
         if (order.TotalCents > 0)
         {
+            // Filter to positive totals BEFORE Take(50) so zero/credit rows can't shrink the window.
             List<double> customerLogs = history
+                .Where(o => o.TotalCents > 0)
                 .OrderByDescending(o => o.PlacedAt)
                 .Take(BaselineOrderCount)
-                .Where(o => o.TotalCents > 0)
                 .Select(o => Math.Log(o.TotalCents))
                 .ToList();
 
             bool usingCustomer = customerLogs.Count >= MinCustomerBaseline;
-            IReadOnlyList<double> sample = usingCustomer ? customerLogs : globalLogTotals;
+            // The global fallback EXCLUDES the candidate itself, mirroring the per-customer self-exclusion:
+            // a self-included population sample caps |Z| at (N−1)/√N, which is < 3 for N < 11 — Rule 1 would
+            // otherwise be structurally dead on a small/fresh global pool (the cold-start case it serves).
+            IReadOnlyList<double> sample = usingCustomer
+                ? customerLogs
+                : globalLogTotals.Where(g => g.Id != order.Id).Select(g => g.Log).ToList();
 
             double z = ZScoreScorer.Score(Math.Log(order.TotalCents), sample);
             if (Math.Abs(z) > ZThreshold)
             {
                 score = (decimal)Math.Round(Math.Abs(z), 3);
-                reasons.Add($"Order total {Math.Abs(z):0.0}σ from the {(usingCustomer ? "customer's" : "global")} mean");
+                string direction = z > 0 ? "above" : "below";
+                reasons.Add($"Order total {Math.Abs(z):0.0}σ {direction} the {(usingCustomer ? "customer's" : "global")} mean");
             }
         }
 
@@ -230,13 +237,15 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
         return Array.Empty<Order>();
     }
 
-    private async Task<IReadOnlyList<double>> LoadGlobalLogTotalsAsync(CancellationToken ct)
+    // Returns (orderId, log(total)) for every paid order, so callers can exclude the candidate itself
+    // from its own baseline (see Evaluate's self-exclusion note).
+    private async Task<IReadOnlyList<(Guid Id, double Log)>> LoadGlobalLogTotalsAsync(CancellationToken ct)
     {
-        List<int> totals = await _db.Orders.AsNoTracking()
+        var totals = await _db.Orders.AsNoTracking()
             .Where(o => o.Status == OrderStatus.Paid && o.TotalCents > 0)
-            .Select(o => o.TotalCents)
+            .Select(o => new { o.Id, o.TotalCents })
             .ToListAsync(ct);
-        return totals.Select(t => Math.Log(t)).ToList();
+        return totals.Select(t => (t.Id, Math.Log(t.TotalCents))).ToList();
     }
 
     private static string Truncate(string value, int max) =>

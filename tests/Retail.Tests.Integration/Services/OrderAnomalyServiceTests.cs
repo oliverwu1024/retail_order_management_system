@@ -124,6 +124,25 @@ public class OrderAnomalyServiceTests
         Assert.Equal(1, rows);
     }
 
+    [Fact]
+    public async Task ScanAsync_FlagsRecentAnomalousOrders_NotNormalOnes()
+    {
+        // Exercises the batch scan path (candidate query + per-buyer/global baseline preload + AddRange),
+        // scoped to this test's own orders since the Testcontainers DB is shared.
+        Guid anomalous = await SeedScenarioAsync(NormalHistory, testTotalCents: 5_100, country: "AU", qty: 9);
+        Guid normal = await SeedScenarioAsync(NormalHistory, testTotalCents: 5_100, country: "AU", qty: 1);
+
+        using (IServiceScope scope = _factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IOrderAnomalyService>().ScanAsync();
+        }
+
+        using IServiceScope read = _factory.Services.CreateScope();
+        RetailDbContext db = read.ServiceProvider.GetRequiredService<RetailDbContext>();
+        Assert.True(await db.OrderAnomalies.AnyAsync(a => a.OrderId == anomalous), "the qty-9 order should be flagged");
+        Assert.False(await db.OrderAnomalies.AnyAsync(a => a.OrderId == normal), "the normal order should not be flagged");
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     // Seeds a unique variant + (for a member) a buyer with the given history totals + the order under test.

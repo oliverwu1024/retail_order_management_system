@@ -44,4 +44,17 @@ public class ZScoreScorerTests
 
         Assert.Equal(0, ZScoreScorer.Score(8, sample), 6);
     }
+
+    [Fact]
+    public void Score_ValuePresentInItsOwnSample_IsDampenedBelowThreshold()
+    {
+        // A point that is a member of its own (small) population-σ sample is mathematically capped well
+        // below |Z| = 3 — this is exactly why OrderAnomalyService EXCLUDES the candidate from the global
+        // baseline (a self-included cold-start sample would make Rule 1 unable to flag anything).
+        double[] withSelf = { 8.4, 8.5, 8.6, 8.5, 8.45, 8.55, 13.0 }; // the extreme 13.0 is in the sample
+        double[] withoutSelf = { 8.4, 8.5, 8.6, 8.5, 8.45, 8.55 };
+
+        Assert.True(Math.Abs(ZScoreScorer.Score(13.0, withSelf)) < 3, "self-included is capped below the threshold");
+        Assert.True(Math.Abs(ZScoreScorer.Score(13.0, withoutSelf)) > 3, "self-excluded flags");
+    }
 }

@@ -45,7 +45,13 @@ describe('ROLE_SETS capability matrix', () => {
   })
 
   it('admits all three back-office roles to the view-level areas', () => {
-    for (const set of [ROLE_SETS.orders, ROLE_SETS.inventory, ROLE_SETS.audit, ROLE_SETS.reports]) {
+    for (const set of [
+      ROLE_SETS.orders,
+      ROLE_SETS.inventory,
+      ROLE_SETS.audit,
+      ROLE_SETS.reports,
+      ROLE_SETS.risk,
+    ]) {
       expect(set).toEqual(ADMIN_AREA_ROLES)
     }
   })

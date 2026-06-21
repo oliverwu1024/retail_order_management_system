@@ -44,7 +44,7 @@ describe('RiskQueuePage', () => {
     expect(screen.getByText('#10392')).toBeInTheDocument()
     expect(screen.getByText(/from the customer mean/i)).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await userEvent.click(screen.getByRole('button', { name: /acknowledge order #10392/i }))
     expect(mutate).toHaveBeenCalledWith('a1')
   })
 
