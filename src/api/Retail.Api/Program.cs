@@ -410,6 +410,16 @@ try
     builder.Services.AddScoped<IReviewSentimentService, ReviewSentimentService>();
     builder.Services.AddHostedService<ReviewSentimentHostedService>();
 
+    // Order-anomaly detection (Phase 5B). The scanner is scoped; the hosted service is gated OFF in
+    // the "Testing" environment because it scans IMMEDIATELY on startup (PHASE_5B_SCOPE §14) — an
+    // immediate scan would otherwise flag orders other integration tests seed. Tests cover the logic
+    // by resolving IOrderAnomalyService directly.
+    builder.Services.AddScoped<IOrderAnomalyService, OrderAnomalyService>();
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddHostedService<Retail.Api.HostedServices.OrderAnomalyHostedService>();
+    }
+
     // ── AI: Support chatbot (Phase 5A) ────────────────────────────────────────
     // Reuses the ILlmClient seam (stub/Anthropic by Ai:Mode). The multi-turn tool_use/tool_result
     // loop lives in ChatService; the tools are owner-scoped via the existing order read-services, so

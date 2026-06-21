@@ -114,10 +114,10 @@ public sealed class OrderDemoSeeder
         // ── Injected anomalies (recent, so the 14-day scan window catches them) ──
         DateTimeOffset recent = now.AddDays(-1);
 
-        // (1) Z-score: a huge total — 5 distinct variants × qty 5 (no single line > 5, so it reads as
-        // a spend anomaly, not a quantity one).
-        List<(ProductVariant, int)> bigLines = variants.Take(Math.Min(5, variants.Count))
-            .Select(v => (v, 5)).ToList();
+        // (1) Z-score: a very large total — 5 units of EVERY active variant (no single line > 5, so it
+        // reads as a spend anomaly, not a quantity one). It must clear |Z| > 3 in LOG space against the
+        // buyer's baseline, so it's deliberately several × the largest normal order.
+        List<(ProductVariant, int)> bigLines = variants.Select(v => (v, 5)).ToList();
         _db.Orders.Add(BuildOrder(profiles[0].Id, recent, bigLines, "AU", seq++));
 
         // (2) New shipping country: an otherwise-normal order shipping to a country this buyer (all-AU
@@ -135,10 +135,12 @@ public sealed class OrderDemoSeeder
             seq, CustomerCount, Days);
     }
 
-    // 1–3 lines of distinct variants, each qty 1–3 → normal, never trips a rule.
+    // 1–2 lines of distinct variants, each qty 1–2 → normal, never trips a rule. Kept deliberately
+    // tight so the per-customer spend baseline has a small spread and the injected big-total anomaly
+    // clears the Z-score threshold (a wide baseline would absorb it under the log transform).
     private static List<(ProductVariant Variant, int Qty)> PickNormalLines(List<ProductVariant> variants, Random rng)
     {
-        int lineCount = Math.Min(1 + rng.Next(3), variants.Count);
+        int lineCount = Math.Min(1 + rng.Next(2), variants.Count);
         var chosen = new List<(ProductVariant, int)>(lineCount);
         var used = new HashSet<int>();
         while (chosen.Count < lineCount)
@@ -146,7 +148,7 @@ public sealed class OrderDemoSeeder
             int idx = rng.Next(variants.Count);
             if (used.Add(idx))
             {
-                chosen.Add((variants[idx], 1 + rng.Next(3)));
+                chosen.Add((variants[idx], 1 + rng.Next(2)));
             }
         }
 
