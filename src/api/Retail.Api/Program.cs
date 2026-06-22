@@ -289,6 +289,7 @@ try
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IdentityDataSeeder>();
+    builder.Services.AddScoped<CatalogDemoSeeder>();
     builder.Services.AddScoped<ReviewDemoSeeder>();
     builder.Services.AddScoped<ChatDemoSeeder>();
     builder.Services.AddScoped<OrderDemoSeeder>();
@@ -700,7 +701,9 @@ try
         {
             IdentityDataSeeder seeder = scope.ServiceProvider.GetRequiredService<IdentityDataSeeder>();
             await seeder.SeedAsync();
-            // Development-only demo reviews + chat sessions (idempotent, no-op outside Development).
+            // Development-only demo data (idempotent, no-op outside Development). Catalog FIRST — the
+            // review + order seeders require published products / active variants to build on.
+            await scope.ServiceProvider.GetRequiredService<CatalogDemoSeeder>().SeedAsync();
             await scope.ServiceProvider.GetRequiredService<ReviewDemoSeeder>().SeedAsync();
             await scope.ServiceProvider.GetRequiredService<ChatDemoSeeder>().SeedAsync();
             await scope.ServiceProvider.GetRequiredService<OrderDemoSeeder>().SeedAsync();
