@@ -35,7 +35,7 @@ public class OrderAnomalyServiceTests
 
         Assert.NotNull(anomaly);
         Assert.True(anomaly!.Score > 3, $"expected a Z-score > 3 but was {anomaly.Score}");
-        Assert.Contains("mean", anomaly.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("far above", anomaly.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class OrderAnomalyServiceTests
 
         Assert.NotNull(anomaly);
         Assert.True(anomaly!.Score > 3, $"expected a Z-score > 3 but was {anomaly.Score}");
-        Assert.Contains("mean", anomaly.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("far above", anomaly.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -72,7 +72,8 @@ public class OrderAnomalyServiceTests
         OrderAnomaly? anomaly = await EvaluateAndGetAsync(orderId);
 
         Assert.NotNull(anomaly);
-        Assert.Contains("Ships to US", anomaly!.Reason);
+        Assert.Contains("new country", anomaly!.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("US", anomaly.Reason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -94,7 +95,7 @@ public class OrderAnomalyServiceTests
 
         OrderAnomaly? anomaly = await EvaluateAndGetAsync(orderId);
 
-        Assert.True(anomaly is null || !anomaly.Reason.Contains("Ships to", StringComparison.Ordinal));
+        Assert.True(anomaly is null || !anomaly.Reason.Contains("new country", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public class OrderAnomalyServiceTests
 
         Assert.NotNull(anomaly);
         Assert.Contains("quantity", anomaly!.Reason, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Ships to", anomaly.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("new country", anomaly.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

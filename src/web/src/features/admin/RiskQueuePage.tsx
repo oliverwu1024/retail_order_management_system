@@ -24,7 +24,7 @@ export function RiskQueuePage() {
     { key: 'reason', header: 'Reason', cell: (row) => row.reason ?? '' },
     {
       key: 'score',
-      header: 'Z-score',
+      header: 'Score',
       className: 'text-right',
       cell: (row) => formatScore(row.score),
     },

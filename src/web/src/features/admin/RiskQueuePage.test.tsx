@@ -23,7 +23,8 @@ const PAGE = {
       orderId: 'o1',
       orderNumber: 10392,
       score: 7.2,
-      reason: 'Order total 7.2σ from the customer mean',
+      reason:
+        "Order total is far above this customer's usual spend — possible fraud, review before shipping",
       detectedAt: '2026-06-20T00:00:00Z',
       acknowledged: false,
     },
@@ -42,7 +43,7 @@ describe('RiskQueuePage', () => {
 
     render(<RiskQueuePage />)
     expect(screen.getByText('#10392')).toBeInTheDocument()
-    expect(screen.getByText(/from the customer mean/i)).toBeInTheDocument()
+    expect(screen.getByText(/far above this customer's usual spend/i)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /acknowledge order #10392/i }))
     expect(mutate).toHaveBeenCalledWith('a1')

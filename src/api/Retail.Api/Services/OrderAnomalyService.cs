@@ -180,8 +180,10 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
             if (Math.Abs(z) > ZThreshold)
             {
                 score = (decimal)Math.Round(Math.Abs(z), 3);
-                string direction = z > 0 ? "above" : "below";
-                reasons.Add($"Order total {Math.Abs(z):0.0}σ {direction} the {(usingCustomer ? "customer's" : "global")} mean");
+                string scope = usingCustomer ? "this customer's usual spend" : "the typical order";
+                reasons.Add(z > 0
+                    ? $"Order total is far above {scope} — possible fraud, review before shipping"
+                    : $"Order total is far below {scope} — worth a quick check");
             }
         }
 
@@ -199,7 +201,7 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
 
                 if (priorCountries.Count > 0 && !priorCountries.Contains(country))
                 {
-                    reasons.Add($"Ships to {country}, not seen on this customer's prior orders");
+                    reasons.Add($"Shipping to a new country for this customer ({country}) — possible account takeover");
                 }
             }
         }
@@ -208,7 +210,7 @@ public sealed class OrderAnomalyService : IOrderAnomalyService
         int maxQuantity = order.Lines.Count == 0 ? 0 : order.Lines.Max(l => l.Quantity);
         if (maxQuantity > MaxLineQuantity)
         {
-            reasons.Add($"Line quantity {maxQuantity} exceeds {MaxLineQuantity}");
+            reasons.Add($"Unusually large quantity ({maxQuantity} of one item) — review before shipping");
         }
 
         if (reasons.Count == 0)

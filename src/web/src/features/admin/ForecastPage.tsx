@@ -67,8 +67,8 @@ export function ForecastPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Demand forecast</h1>
         <p className="text-sm text-muted-foreground">
-          14-day demand per variant (Holt-Winters) with an 80% prediction band, and the reorder
-          hints it drives.
+          Projected 14-day demand per variant, with a likely high–low range, and the reorder hints
+          it drives.
         </p>
       </div>
 
@@ -88,7 +88,7 @@ export function ForecastPage() {
         ) : (
           <div className="h-72 w-full">
             <p className="sr-only">
-              14-day demand forecast with an 80% prediction band for {chartData.length} variant
+              Projected 14-day demand with a likely high–low range for {chartData.length} variant
               {chartData.length === 1 ? '' : 's'}; per-variant values are listed in the reorder
               hints table below.
             </p>
@@ -99,17 +99,17 @@ export function ForecastPage() {
                 <YAxis tick={{ fontSize: 12 }} width={48} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="forecast" name="14-day forecast" fill="#6366f1" />
+                <Bar dataKey="forecast" name="Forecast" fill="#6366f1" />
                 <Line
                   dataKey="upper"
-                  name="80% upper"
+                  name="Likely high"
                   stroke="#a3a3a3"
                   dot={false}
                   strokeDasharray="4 2"
                 />
                 <Line
                   dataKey="lower"
-                  name="80% lower"
+                  name="Likely low"
                   stroke="#a3a3a3"
                   dot={false}
                   strokeDasharray="4 2"
