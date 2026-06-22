@@ -34,7 +34,7 @@ Success = deployed to Azure with a public URL, four AI surfaces visibly working,
 | Code quality measurement | **Coverlet (coverage, 85% gate)** + **jscpd (duplication, before/after reports)** *(added 2026-06-06)* |
 | AI #1 — Chatbot | **Custom React Tailwind drawer** (Phase 5) → ASP.NET webhook → Anthropic Claude API (tool use). **Copilot Studio bot** as Phase 6 stretch reusing same webhook contract. |
 | AI #2 — Copy gen | Anthropic Claude API (admin-triggered) behind `ILlmClient` (ADR-0005) |
-| AI #3 — Forecasting | ML.NET SSA time-series, nightly retrain |
+| AI #3 — Forecasting | **As-built: pure-C# Holt-Winters time-series** (was ML.NET SSA — dropped over its Intel-MKL/`libiomp5` Linux native dep; see **ADR-0012** + PHASE_5B_FORECAST_SCOPE §4). DB-rows, in-process daily refresh. |
 | AI #4 — Sentiment + anomaly | Azure AI Language (sentiment) + Z-score in-process (anomaly) |
 | Promotions (Phase 7) | Vouchers + Loyalty (Medium) + unified pricing pipeline |
 | Payments | Stripe Checkout, **test mode forever** |
@@ -244,7 +244,7 @@ Monorepo over polyrepo: one PR can change contract + client + IaC together; CI r
 - **Background jobs**: mixed — `BackgroundService` for in-process loops; **Azure Service Bus + Azure Functions** for cross-service async work.
 - **Azure SDKs**: `Azure.Messaging.ServiceBus`, `Azure.Messaging.EventGrid`, `Azure.AI.TextAnalytics`, `Azure.Storage.Blobs`, `Azure.Security.KeyVault.Secrets`, `Azure.Identity` (`DefaultAzureCredential` everywhere).
 - **Stripe.NET 47.x** for Checkout + webhook signature verification.
-- **ML.NET 4.x** (`Microsoft.ML` + `Microsoft.ML.TimeSeries`) for SSA forecasting.
+- ~~**ML.NET 4.x** (`Microsoft.ML` + `Microsoft.ML.TimeSeries`) for SSA forecasting.~~ **As-built: none** — forecasting is pure-C# Holt-Winters, no ML.NET package (ADR-0012).
 - **Anthropic.SDK** behind `ILlmClient` (ADR-0005). Services never `using Anthropic.SDK`.
 - **OpenAPI**: `Swashbuckle.AspNetCore` (Swagger UI in non-prod, exported as OpenAPI 3.0 to APIM in prod).
 
@@ -359,7 +359,12 @@ All non-public endpoints require JWT (delivered via HTTP-only cookie). `Idempote
 - `POST /api/v1/catalog/products/{id}/generate-copy` → `CopyGenService`.
 - Tool-forced JSON output (`emit_product_copy`). Never auto-save.
 
-### 8c. Demand Forecasting (ML.NET SSA, nightly retrain)
+### 8c. Demand Forecasting
+> **As-built (Phase 5B — ADR-0012 + PHASE_5B_FORECAST_SCOPE):** shipped as **pure-C# Holt-Winters**
+> (not ML.NET SSA — its Intel-MKL/`libiomp5` native dep is absent on Linux dev + CI), written as
+> **DB rows** by an in-process daily `ForecastRefreshHostedService` (no Azure Blob/Function this phase).
+> `ml-train.yml` is a build-only scaffold; the `Retail.Ml.Trainer` CLI does a manual recompute. The
+> original ML.NET-SSA/Blob/Function plan below is the pre-build intent.
 - Per-variant 14-day forecast with safety-stock-based reorder hints.
 - Nightly retrain via `ml-train.yml` + `ForecastRefreshFn` Azure Function.
 
@@ -444,7 +449,7 @@ All app→Azure auth via system-assigned Managed Identity + `DefaultAzureCredent
 | `cd-staging.yml` | push to `main` (after ci) | OIDC → ACR push (api + functions images) → `az containerapp update` + `az functionapp deployment` → smoke `/health/ready` |
 | `cd-prod.yml` | manual dispatch + env approval | Re-tag staging image to `:prod`, deploy, smoke |
 | `iac.yml` | changes to `infra/**` | `bicep what-if` on PR; deploy on merge (dev) / manual (prod) |
-| `ml-train.yml` | cron `0 7 * * *` UTC | Train SSA models, push to Blob with manifest |
+| `ml-train.yml` | _as-built: `workflow_dispatch`, build-only_ | Planned: cron train + push to Blob; shipped as a build-only scaffold (forecasting is in-process Holt-Winters — ADR-0012) |
 | `load-test.yml` | nightly cron + manual | Run k6 against staging, upload results as artifact, post summary to PR comment if comparing against baseline |
 
 Deployment success tracked via GH API; weekly script in `tests/load/` aggregates success/total ratio for the resume claim.
@@ -521,7 +526,7 @@ Each phase is **independently demo-able**. Weeks are best-case targets; ~31–40
 - `/api/v1/chat/webhook` (cookie auth + CSRF).
 - Claude tool calls including `get_my_loyalty_balance`, `list_my_vouchers` (stubbed until Phase 7).
 - `ChatSession`/`ChatMessage` persistence.
-- ML.NET SSA forecasting + nightly training via `ml-train.yml`.
+- Demand forecasting (**as-built: pure-C# Holt-Winters, not ML.NET SSA — ADR-0012**) + build-only `ml-train.yml` scaffold.
 - `DemandForecast` + `ReorderHint` + dashboard tile.
 - Order anomaly Z-score job (in-process `BackgroundService` for now; moved to a Function in Phase 8).
 - Demo data seeder: 6 months of synthetic orders.

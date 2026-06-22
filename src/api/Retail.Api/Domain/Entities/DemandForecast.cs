@@ -8,8 +8,8 @@ namespace Retail.Api.Domain.Entities;
 /// <remarks>
 /// <para>
 /// SYSTEM-GENERATED, APPENDED PER REFRESH. Written by the daily <c>ForecastService</c> /
-/// <c>ForecastRefreshHostedService</c> (PHASE_5B_FORECAST_SCOPE): for each active variant it fits an
-/// ML.NET SSA model on the 180-day daily-demand series and stores the 14-day-ahead outlook. A new row
+/// <c>ForecastRefreshHostedService</c> (PHASE_5B_FORECAST_SCOPE): for each active variant it fits a
+/// Holt-Winters model on the 180-day daily-demand series and stores the 14-day-ahead outlook. A new row
 /// is appended each run (history retained); the latest is read via
 /// <c>IX_DemandForecast_ProductVariantId_GeneratedAt</c>.
 /// </para>

@@ -307,7 +307,8 @@ Figma UI 链接：*待补充 — 项目自主设计；admin 採用自建 Tailwin
 > **Holt-Winters**（非 ML.NET SSA — SSA 的 Intel MKL/`libiomp5` 原生依赖在 Linux 上缺失）；预测以
 > **DB 行**写入（无 Azure Blob / ModelStore — Phase 8 延后）；冷启动变体**跳过不写行**（以"行不存在"
 > 表示 warming up，而非写 `Confidence=0` 哨兵行）；`ml-train.yml` 为 build-only 脚手架，真正的每日刷新
-> 是进程内 `ForecastRefreshHostedService`。
+> 是进程内 `ForecastRefreshHostedService`。另：`DemandForecast` **每次刷新追加一行**（保留历史，读取时
+> 用 correlated-subquery 取最新），而非「每个变体 1 条最新」；只有 `ReorderHint` 每变体 upsert 一行。
 
 ---
 

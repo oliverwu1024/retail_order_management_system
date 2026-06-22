@@ -32,11 +32,20 @@ services.AddScoped<IForecastService, ForecastService>();
 await using ServiceProvider provider = services.BuildServiceProvider();
 
 Console.WriteLine("Retail.Ml.Trainer: recomputing demand forecasts...");
-await using AsyncServiceScope scope = provider.CreateAsyncScope();
-IForecastService forecasts = scope.ServiceProvider.GetRequiredService<IForecastService>();
-int written = await forecasts.RefreshAsync();
-Console.WriteLine($"Retail.Ml.Trainer: wrote {written} variant forecast(s).");
-return 0;
+try
+{
+    await using AsyncServiceScope scope = provider.CreateAsyncScope();
+    IForecastService forecasts = scope.ServiceProvider.GetRequiredService<IForecastService>();
+    int written = await forecasts.RefreshAsync();
+    Console.WriteLine($"Retail.Ml.Trainer: wrote {written} variant forecast(s).");
+    return 0;
+}
+catch (Exception ex)
+{
+    // Clean non-zero exit + message instead of an unhandled crash (mirrors the hosted service's resilience).
+    Console.Error.WriteLine($"Retail.Ml.Trainer: forecast refresh failed: {ex}");
+    return 1;
+}
 
 // The trainer is a background tool, not a user request → a "system" audit actor (null user).
 internal sealed class SystemUserAccessor : ICurrentUserAccessor

@@ -3,7 +3,7 @@ namespace Retail.Ml.Forecasting;
 /// <summary>
 /// Deterministic, training-free forecaster for <c>Forecast:Mode=stub</c> (Phase 5B §3.3): a flat
 /// forecast at the trailing-mean of recent demand with a fixed ±20% band. Lets a fresh/empty clone,
-/// CI, and tests produce reproducible forecasts with no ML.NET fit.
+/// CI, and tests produce reproducible forecasts with no model fit.
 /// </summary>
 public sealed class StubDemandForecaster : IDemandForecaster
 {

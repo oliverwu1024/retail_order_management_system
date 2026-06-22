@@ -19,7 +19,7 @@ namespace Retail.Api.Services;
 /// </remarks>
 public sealed class ForecastService : IForecastService
 {
-    private const int SeriesDays = 180; // daily-demand window / SSA-era trainSize
+    private const int SeriesDays = 180; // daily-demand window (the forecaster's train size)
     private const int Horizon = 14;     // forecast horizon (days)
     private static readonly OrderStatus[] PaidStatuses = { OrderStatus.Paid, OrderStatus.Fulfilled };
 
@@ -48,12 +48,16 @@ public sealed class ForecastService : IForecastService
     {
         DateTimeOffset now = _clock.GetUtcNow();
         DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
-        DateTimeOffset windowStart = now.AddDays(-SeriesDays);
+        // Midnight UTC of the earliest series day — matches DailySeriesBuilder's [today-(SeriesDays-1), today]
+        // window exactly (a plain now.AddDays(-SeriesDays) would pull one extra boundary day the builder drops).
+        DateTimeOffset windowStart = new(today.AddDays(-(SeriesDays - 1)).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         string modelVersion = _settings.IsStub ? "stub" : today.ToString("yyyy-MM-dd");
 
+        // Active variants of non-deleted products. Skipping soft-deleted-product variants here keeps the
+        // writes consistent with the reads (which inner-join Product's !IsDeleted filter) — no dead rows.
         List<ProductVariant> variants = await _db.ProductVariants.AsNoTracking()
             .Include(v => v.Inventory)
-            .Where(v => v.IsActive)
+            .Where(v => v.IsActive && !v.Product!.IsDeleted)
             .ToListAsync(ct);
         if (variants.Count == 0)
         {
@@ -78,10 +82,15 @@ public sealed class ForecastService : IForecastService
                     .GroupBy(r => DateOnly.FromDateTime(r.PlacedAt.UtcDateTime))
                     .ToDictionary(byDay => byDay.Key, byDay => byDay.Sum(r => r.Quantity)));
 
-        // Existing reorder hints (TRACKED — we upsert in place, preserving Dismissed).
-        Dictionary<Guid, ReorderHint> existingHints = await _db.ReorderHints
-            .Where(h => variantIds.Contains(h.ProductVariantId))
-            .ToDictionaryAsync(h => h.ProductVariantId, ct);
+        // Existing reorder hints (TRACKED — we upsert in place, preserving Dismissed). Grouped tolerantly
+        // (First per variant) rather than ToDictionary so a stray duplicate row — possible only under the
+        // documented Phase-8 multi-writer race, since there's no UNIQUE(ProductVariantId) yet — degrades to
+        // "update one, leave the dup" instead of throwing and bricking every future refresh (review §17).
+        Dictionary<Guid, ReorderHint> existingHints = (await _db.ReorderHints
+                .Where(h => variantIds.Contains(h.ProductVariantId))
+                .ToListAsync(ct))
+            .GroupBy(h => h.ProductVariantId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         int forecast = 0;
         foreach (ProductVariant variant in variants)

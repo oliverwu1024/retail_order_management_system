@@ -45,7 +45,7 @@ Implement fraud scoring as a **per-customer Z-score on transaction amount**, wit
 - **No deprecated-service risk.** Z-score is forever. The pipeline is ours; the algorithm is textbook.
 - **Interview-defensible.** "I implemented Z-score with a log transform on per-customer baselines, with cohort fallback for cold start" is a complete story whose math fits on a whiteboard.
 - **No external API dependency.** Works offline; no per-call cost; no rate limit; no extra outage risk in the order pipeline.
-- **Composes with the rest of the ML stack.** `Retail.Ml` already trains demand-forecast and recommendation models; adding baselines is one more pipeline, not a new technology.
+- **Composes with the rest of the ML stack.** `Retail.Ml` houses the other analytics models; adding baselines is one more pipeline, not a new technology. _(As-built note: demand forecasting shipped as pure-C# Holt-Winters with no persisted/recommendation model — ADR-0012; this bullet was aspirational at write time.)_
 - **Per-customer baseline is the right unit of normalisation.** A USD 500 transaction is unusual for a customer who averages USD 30 and normal for one who averages USD 400. Anomaly Detector's per-series mode would have given the same shape with more cost.
 
 **Negative / trade-offs**
@@ -64,7 +64,7 @@ Implement fraud scoring as a **per-customer Z-score on transaction amount**, wit
    - Rejected: overkill for primarily univariate signal. PCA on 1–3 features is contrived; the trainer's hyper-parameters are harder to defend than "mean and stddev of log-amount". The story it tells an interviewer is muddier.
 
 3. **ML.NET `SrCnnAnomalyDetector` (time-series)**
-   - Rejected: time-series methods fit aggregate signals (orders per minute) rather than per-transaction outlier detection. We use it elsewhere for demand forecasting, not for fraud.
+   - Rejected: time-series methods fit aggregate signals (orders per minute) rather than per-transaction outlier detection. Demand forecasting is a separate concern (and shipped as Holt-Winters, not an ML.NET time-series trainer — ADR-0012), not fraud.
 
 4. **Isolation Forest via ONNX import or Python training**
    - Rejected: introduces a Python or ONNX-import pipeline whose complexity does not pay back at our feature count. Z-score covers the use case in two days.

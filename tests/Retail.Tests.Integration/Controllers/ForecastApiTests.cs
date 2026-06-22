@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Retail.Api.Data;
 using Retail.Api.Domain.Entities;
@@ -75,6 +76,31 @@ public class ForecastApiTests
         Assert.DoesNotContain(
             data.GetProperty("items").EnumerateArray(),
             h => h.GetProperty("sku").GetString() == sku);
+    }
+
+    [Fact]
+    public async Task SoftDeletedProduct_DropsForecastRow_AndKeepsTotalConsistent()
+    {
+        (string sku, _) = await SeedForecastAsync();
+
+        // Soft-delete the variant's product (mirrors CatalogService.SoftDeleteProductAsync).
+        using (IServiceScope seed = _factory.Services.CreateScope())
+        {
+            RetailDbContext db = seed.ServiceProvider.GetRequiredService<RetailDbContext>();
+            ProductVariant variant = await db.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == sku);
+            Product product = await db.Products.FirstAsync(p => p.Id == variant.ProductId);
+            product.IsDeleted = true;
+            await db.SaveChangesAsync();
+        }
+
+        (HttpClient staff, _) = await LoginAsync("staff@test.local", "TestStaff123456");
+        JsonElement data = await GetJsonAsync(staff, "/api/v1/analytics/forecast?Page=1&PageSize=100");
+
+        // The deleted product's forecast drops AND totalCount stays consistent with items (no phantom page row).
+        Assert.DoesNotContain(
+            data.GetProperty("items").EnumerateArray(),
+            f => f.GetProperty("sku").GetString() == sku);
+        Assert.Equal(data.GetProperty("items").GetArrayLength(), data.GetProperty("totalCount").GetInt32());
     }
 
     [Fact]

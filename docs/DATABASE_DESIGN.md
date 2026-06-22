@@ -633,9 +633,9 @@ CREATE INDEX        IX_AuditLog_EntityType_EntityId
                                               ON AuditLog (EntityType, EntityId);
 CREATE INDEX        IX_AuditLog_OccurredAt    ON AuditLog (OccurredAt DESC);
 CREATE INDEX        IX_DemandForecast_ProductVariantId_GeneratedAt
-                                              ON DemandForecast (ProductVariantId, GeneratedAt DESC);
+                                              ON DemandForecast (ProductVariantId, GeneratedAt);
 CREATE INDEX        IX_ReorderHint_ProductVariantId_Dismissed_RecommendedOrderQty
-                                              ON ReorderHint (ProductVariantId, Dismissed, RecommendedOrderQty DESC);
+                                              ON ReorderHint (ProductVariantId, Dismissed, RecommendedOrderQty);
 CREATE INDEX        IX_OrderAnomaly_Acknowledged_DetectedAt
                                               ON OrderAnomaly (Acknowledged, DetectedAt DESC);
 

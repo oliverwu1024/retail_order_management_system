@@ -59,10 +59,13 @@ public sealed class ReportQueryService : IReportQueryService
 
         // Latest row per variant via a correlated subquery (a naive GroupBy-then-take-latest doesn't
         // translate). Append-per-refresh means many rows per variant; we want the most recent.
+        // The Product reference applies its !IsDeleted query filter (inner join) to BOTH the count and the
+        // items, so a soft-deleted product's forecast drops from both — total stays consistent with items.
         IQueryable<DemandForecast> latest = _db.DemandForecasts.AsNoTracking()
             .Where(f => f.GeneratedAt == _db.DemandForecasts
                 .Where(x => x.ProductVariantId == f.ProductVariantId)
-                .Max(x => x.GeneratedAt));
+                .Max(x => x.GeneratedAt))
+            .Where(f => !f.ProductVariant.Product!.IsDeleted);
         int total = await latest.CountAsync(ct);
 
         List<ForecastDto> items = await latest
@@ -84,7 +87,8 @@ public sealed class ReportQueryService : IReportQueryService
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         IQueryable<ReorderHint> active = _db.ReorderHints.AsNoTracking()
-            .Where(h => !h.Dismissed && h.RecommendedOrderQty > 0);
+            .Where(h => !h.Dismissed && h.RecommendedOrderQty > 0)
+            .Where(h => !h.ProductVariant.Product!.IsDeleted); // keep total consistent with items (see GetForecastsAsync)
         int total = await active.CountAsync(ct);
 
         List<ReorderHintDto> items = await active

@@ -2,15 +2,15 @@ namespace Retail.Ml.Forecasting;
 
 /// <summary>
 /// Collapses a per-day <see cref="HorizonForecast"/> into a single total-over-horizon
-/// <see cref="DemandForecastSummary"/>. Pure + deterministic — the covered home of the clamp +
-/// band-propagation logic (the SSA fit itself is the only excluded glue).
+/// <see cref="DemandForecastSummary"/>. Pure + deterministic — the (fully covered) home of the clamp +
+/// band-propagation logic.
 /// </summary>
 public static class ForecastMath
 {
     /// <summary>
     /// Sums the (clamped) per-day point forecasts and propagates the band by QUADRATURE:
-    /// every per-day forecast/upper is floored at 0 (demand can't be negative — SSA on a sparse series
-    /// emits negatives), <c>TotalForecast = Σ forecastᵢ</c>, and the half-width on the total is
+    /// every per-day forecast/upper is floored at 0 (demand can't be negative — additive smoothing on a
+    /// sparse series can emit negatives), <c>TotalForecast = Σ forecastᵢ</c>, and the half-width on the total is
     /// <c>√Σ (upperᵢ − forecastᵢ)²</c> — the independent-errors propagation, far closer to the true CI
     /// of a sum than naively summing the per-day bounds. The lower bound is floored at 0.
     /// </summary>

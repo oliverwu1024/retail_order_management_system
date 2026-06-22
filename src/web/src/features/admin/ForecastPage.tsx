@@ -53,7 +53,7 @@ export function ForecastPage() {
           variant="outline"
           size="sm"
           aria-label={`Dismiss reorder hint for ${row.sku ?? ''}`}
-          disabled={dismiss.isPending || !row.id}
+          disabled={(dismiss.isPending && dismiss.variables === row.id) || !row.id}
           onClick={() => row.id && dismiss.mutate(row.id)}
         >
           Dismiss
@@ -87,6 +87,11 @@ export function ForecastPage() {
           />
         ) : (
           <div className="h-72 w-full">
+            <p className="sr-only">
+              14-day demand forecast with an 80% prediction band for {chartData.length} variant
+              {chartData.length === 1 ? '' : 's'}; per-variant values are listed in the reorder
+              hints table below.
+            </p>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />

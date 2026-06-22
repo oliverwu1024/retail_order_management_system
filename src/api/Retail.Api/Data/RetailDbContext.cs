@@ -132,7 +132,7 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<OrderAnomaly> OrderAnomalies => Set<OrderAnomaly>();
 
     // ── Demand forecasting (Phase 5B) ────────────────────────────────────────
-    /// <summary>Per-variant SSA demand forecasts (appended per daily refresh; latest read by GeneratedAt).</summary>
+    /// <summary>Per-variant demand forecasts (appended per daily refresh; latest read by GeneratedAt).</summary>
     public DbSet<DemandForecast> DemandForecasts => Set<DemandForecast>();
 
     /// <summary>Per-variant restock recommendations (one upserted row per variant; Dismissed sticks).</summary>

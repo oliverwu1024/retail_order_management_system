@@ -39,7 +39,7 @@ fresh/empty clone, CI, and tests).
 - **`Forecast:Mode`** seam (`hw` | `stub`, default `hw`; the config-selected-impl mechanism of `Ai:Mode`) selecting the forecaster at DI.
 - **API**: `GET /api/v1/analytics/forecast` (latest per variant + CI), `GET /api/v1/analytics/reorder-hints` (active, ranked), `POST /api/v1/analytics/reorder-hints/{id}/dismiss` — all gated by a **new `Forecast.View` policy** (Staff + StoreManager + Administrator).
 - **FE**: a dedicated **`/admin/forecast`** page — per-variant **Recharts** line + 80% confidence band + a reorder-hints list with **Dismiss**; `SidebarNav` item + `ROLE_SETS.forecast` + route.
-- **`Retail.Ml.Trainer` CLI** (scaffold) — a runnable console that reuses the **same** `ForecastService` (C2) + `RetailDbContextFactory` to recompute + write rows on demand (`dotnet run`).
+- **`Retail.Ml.Trainer` CLI** (scaffold) — a runnable console that reuses the **same** `ForecastService.RefreshAsync` (C2) and **mirrors** `RetailDbContextFactory`'s connection-string resolution (env `ConnectionStrings__Default`, else the docker-compose default) to recompute + write rows on demand (`dotnet run`).
 - **`ml-train.yml`** — a **build-only / `workflow_dispatch`** GitHub Action proving the nightly-pipeline shape (no Azure, no cron execution).
 - **Hermetic tests** (no Azure, no key): `DailySeriesBuilder` + `ForecastMath` + forecaster unit tests (Holt-Winters is deterministic → exact assertions), `ForecastService` integration (Holt-Winters on seeded data + cold-start + reorder math + dismiss + RBAC), `/admin/forecast` Vitest.
 - **An ADR** recording the DB-rows/$0 decision **and the SSA→Holt-Winters pivot** (the MKL native-dep rationale).
@@ -62,7 +62,7 @@ a runnable console (a manual recompute), and **`ml-train.yml`** is a **build-onl
 scaffold** that proves the nightly-pipeline shape. **Why:** keeps dev/CI/demo entirely $0/in-process
 (the locked DB-rows decision) while still shipping the tangible "forecasting pipeline" artifact; the
 real Azure cron + Blob is Phase 8. The CLI **reuses `IForecastService.RefreshAsync`** (it takes a
-`ProjectReference` to `Retail.Api` for the service + `RetailDbContextFactory` — a deliberate tool→app
+`ProjectReference` to `Retail.Api` for the service + `RetailDbContext`/entities — a deliberate tool→app
 reference; §13 C4), so the service and the CLI write rows through the **same** path — no logic
 duplication.
 
@@ -79,7 +79,7 @@ keyless, hermetic, simplest read path; matches PLAN's in-process-now / Function-
 **mechanism** as `Ai:Mode`, but the **default is `hw`** (the real model), not stub. (`Ai:Mode` defaults
 to `stub` because it needs a paid key; forecasting needs none, so real-by-default is correct.) **`hw`**
 = `HoltWintersForecaster` (pure C#, deterministic — no seed/native runtime needed); **`stub`** = a flat
-trailing-mean forecast (±20% band, `Confidence = 0.5`) for a fresh/empty clone, CI, and tests. **Why:**
+trailing-mean forecast (±20% band) for a fresh/empty clone, CI, and tests. **Why:**
 the real model needs history but cold-start (§3.6) handles the no-data case gracefully, so `hw` is safe
 as the default; the stub gives instant output with zero fit. No key, no `ValidateOnStart` secret
 (unlike `Ai`) — pure compute.
@@ -100,9 +100,9 @@ original SSA plan and carry over unchanged):
   sum of per-day bands. Store `halfWidth = sqrt(Σ (Upperᵢ − Forecastᵢ)²)`, `LowerBound = max(0,
   ForecastedQty − halfWidth)`, `UpperBound = ForecastedQty + halfWidth` — the standard independent-errors
   propagation. (`ForecastMath.Summarize` is the pure, fully-tested home of this clamp + quadrature.)
-- **`Confidence`** (0..1) = `clamp(daysOfHistory / TrainSize(180), 0, 1)` for a real forecast, `0.5`
-  for stub. **Labelled honestly as a data-sufficiency proxy** (how much history backs the forecast),
-  not a calibrated statistical confidence.
+- **`Confidence`** (0..1) = `clamp(daysOfHistory / TrainSize(180), 0, 1)` (both modes — as-built; the
+  service computes it from history regardless of forecaster). **Labelled honestly as a data-sufficiency
+  proxy** (how much history backs the forecast), not a calibrated statistical confidence.
 
 ### 3.5 Reorder hint = one upserted row per variant; Dismissed sticks
 
@@ -118,8 +118,8 @@ dismissing it must persist.
 ### 3.6 Cold-start + degenerate series → skip the variant (no row)
 
 **Decision:** a variant is **skipped** (no `DemandForecast`/`ReorderHint` row; FE shows "Forecast
-warming up") when **either** its order history spans `< 30` days (first→last order, a cheap
-`MIN/MAX(PlacedAt)` per variant) **or** it has **fewer than a floor of non-zero demand-days** (e.g.
+warming up") when **either** its order history spans `< 30` days (as-built: the first sale day in the
+180-day window → today, i.e. `today − MIN(day) + 1`) **or** it has **fewer than a floor of non-zero demand-days** (e.g.
 `< 14`) in the 180-day window. **Why:** the model on a near-empty / mostly-zero series produces a
 meaningless (flat-near-zero) forecast — abstaining beats surfacing noise. (Holt-Winters also has an
 internal flat-mean fallback for series shorter than two seasons; the service-level skip is the primary guard.)
@@ -143,8 +143,8 @@ legible (mirrors `Anomaly.Manage`).
 | 2 | REQUIREMENTS §9.1/§9.2: train `.zip` → Azure Blob `ml-models/`; API `ModelStore` lazy-load + `IMemoryCache` | **Superseded** by DB-rows/$0 (§3.2): in-process compute → rows; no Blob/ModelStore. Recorded in a new ADR. Blob/Function → Phase 8. |
 | 3 | REQUIREMENTS §9.1: nightly via `ml-train.yml` GitHub Actions cron | The real daily runner is the **in-process** `ForecastRefreshHostedService`; `ml-train.yml` is a **build-only scaffold** (§3.1). |
 | 4 | REQUIREMENTS §9.3: `< 30` days → "`Confidence=0`" (implies a row) | As-built: **skip the variant** (no row); UI infers "warming up" from absence (§3.6). |
-| 6 | REQUIREMENTS §9.1 / PLAN §8c: **ML.NET SSA** (`ForecastBySsa`) | As-built: **pure-C# Holt-Winters** (additive triple-exp smoothing). **Why:** ML.NET SSA's eigen-decomposition needs Intel **MKL** (`libiomp5.so`), which is absent on stock Linux dev + CI and not in the NuGet redist (verified: `ldd libMklImports.so` → `libiomp5.so => not found`). The planning probe checked compile, not the runtime fit. Holt-Winters is dependency-free, deterministic, $0/hermetic, and whiteboard-defensible. A managed-SSA or MKL-provisioned ML.NET revisit is a Phase-8+ option. Recorded in the new ADR (§13 C4). |
 | 5 | DATABASE_DESIGN §3.18: `IX_ReorderHint_ProductVariantId_Dismissed_RecommendedOrderQty` (non-unique, implies many rows) | As-built: **one upserted row per variant** (§3.5); the composite index still backs the ranked "top reorder" list. |
+| 6 | REQUIREMENTS §9.1 / PLAN §8c: **ML.NET SSA** (`ForecastBySsa`) | As-built: **pure-C# Holt-Winters** (additive triple-exp smoothing). **Why:** ML.NET SSA's eigen-decomposition needs Intel **MKL** (`libiomp5.so`), which is absent on stock Linux dev + CI and not in the NuGet redist (verified: `ldd libMklImports.so` → `libiomp5.so => not found`). The planning probe checked compile, not the runtime fit. Holt-Winters is dependency-free, deterministic, $0/hermetic, and whiteboard-defensible. A managed-SSA or MKL-provisioned ML.NET revisit is a Phase-8+ option. Recorded in the new ADR (§13 C4). |
 | 7 | DATABASE_DESIGN §3.17 labels `LowerBound`/`UpperBound` as the "80% CI" (with no formula) | As-built: per-day forecaster outputs are clamped ≥ 0, then the **total** band is **quadrature-propagated** (`√Σ(Upperᵢ−Forecastᵢ)²`), not a naive sum of per-day bounds (§3.4) — a documented independent-errors approximation, lower-floored at 0. |
 
 ## 5. Data model — migration `0012_demand_forecast`
@@ -162,7 +162,7 @@ Both entities are `IAuditableEntity`, client-gen GUID PK, `datetimeoffset` times
   - **`HoltWintersForecaster`** (pure C#): additive triple-exp smoothing (level + trend + weekly seasonal, defaults α 0.3 / β 0.1 / γ 0.3, season 7), per-step band `± z·σ·√h` from the in-sample residual σ; a flat-mean fallback when the series is shorter than two seasons. Deterministic, no native deps → **fully covered** (no `[ExcludeFromCodeCoverage]` needed).
   - **`StubDemandForecaster`**: deterministic flat trailing-mean ±20% (§3.3).
   - **`ForecastMath.Summarize`** (pure): clamps the per-day output ≥ 0, sums → `ForecastedQty`, and quadrature-propagates the total band (§3.4) — the covered home of that logic.
-- **`ForecastService`** (scoped, `Retail.Api`): for each active variant — (1) load the raw `OrderLine`+`Order` rows (a translatable predicate: `PaidStatuses.Contains(o.Status)` + `o.PlacedAt ≥ cutoff`, `AsNoTracking`) and **group-by-day + zero-fill IN MEMORY** (EF can't translate a `day(PlacedAt)` grouping — exactly the trap the anomaly/`ReportQueryService.GetSalesByDayAsync` pattern handles in memory); (2) cold-start/degenerate skip (§3.6, from a cheap per-variant `MIN/MAX(PlacedAt)` + non-zero-day count); (3) `DailySeriesBuilder` → `IDemandForecaster` → write a `DemandForecast` (§3.4: clamp, sum, quadrature band); (4) read the variant's `InventoryItem.OnHand`, compute + **upsert** a `ReorderHint` (§3.5). Statuses **{Paid, Fulfilled}** (note: demo orders are Paid-only — the Fulfilled branch is correct but unexercised by the seeder; §17).
+- **`ForecastService`** (scoped, `Retail.Api`): for each active variant — (1) load the raw `OrderLine`+`Order` rows (a translatable predicate: `PaidStatuses.Contains(o.Status)` + `o.PlacedAt ≥ cutoff`, `AsNoTracking`) and **group-by-day + zero-fill IN MEMORY** (EF can't translate a `day(PlacedAt)` grouping — exactly the trap the anomaly/`ReportQueryService.GetSalesByDayAsync` pattern handles in memory); (2) cold-start/degenerate skip (§3.6, from the first-sale-day→today span + non-zero-day count); (3) `DailySeriesBuilder` → `IDemandForecaster` → write a `DemandForecast` (§3.4: clamp, sum, quadrature band); (4) read the variant's `InventoryItem.OnHand`, compute + **upsert** a `ReorderHint` (§3.5). Statuses **{Paid, Fulfilled}** (note: demo orders are Paid-only — the Fulfilled branch is correct but unexercised by the seeder; §17).
 
 ## 7. Refresh job + reorder
 
@@ -208,7 +208,7 @@ POST /api/v1/analytics/reorder-hints/{id}/dismiss     (Forecast.View)  → 200; 
 - **C1 — Forecaster.** `Retail.Ml/Forecasting/` (`DailySeriesBuilder`, `ForecastMath`, `IDemandForecaster` + `HoltWintersForecaster` + `StubDemandForecaster`, `HorizonForecast`/`DemandForecastSummary`) — pure C#, no packages — + unit tests + the `Forecast:Mode` seam. *Verify:* Holt-Winters recovers a flat level + projects a trend (deterministic); stub deterministic; build clean. **(Built — the SSA→Holt-Winters pivot happened here; §4 row 6.)**
 - **C2 — Refresh service + hosted service.** `IForecastService`/`ForecastService` (series query → forecaster → write `DemandForecast` + upsert `ReorderHint`; cold-start skip; dismiss) + `ForecastRefreshHostedService` (daily, gated) + Program.cs registration (`Forecast:Mode`). *Verify (drive `RefreshAsync` directly):* seeded variant → forecast + hint; `< 30`d skipped; second run upserts (no dup hint).
 - **C3 — API + FE.** The three endpoints; `/admin/forecast` page (Recharts CI-band + reorder list + Dismiss) + nav + `ROLE_SETS.forecast` + route. *Verify:* forecast + hints render; dismiss hides; RBAC; gen:api/types/format.
-- **C4 — Trainer CLI + ml-train.yml + docs.** `Retail.Ml.Trainer` becomes a runnable CLI that **reuses `IForecastService.RefreshAsync` (C2)** — it gains a **`ProjectReference` to `Retail.Api`** (to reach `RetailDbContextFactory` + the `RetailDbContext`/entities/`ForecastService`; a deliberate tool→app reference, the design-time-factory's purpose) + its own `Microsoft.Extensions.Configuration/Logging` host wiring. So the CLI and the hosted service write rows through the **same** path (no duplication). `ml-train.yml`: a `workflow_dispatch` job that **builds + runs the Trainer's unit-touch / `dotnet build`** of `Retail.Ml.Trainer` (proves it compiles; no Azure, no cron), SHA-pinned actions per `ci.yml`. Plus the new **ADR** (DB-rows/$0 forecast decision — a new ADR, not an ADR-0003 amendment, since 0003 is the anomaly Z-score); DATABASE_DESIGN §5 (`0012`), REQUIREMENTS §9 reconciliation, and a **new scope §18 as-built** section. *Verify:* `dotnet run --project Retail.Ml.Trainer` writes rows against the dev DB; CI green incl. the build-only workflow.
+- **C4 — Trainer CLI + ml-train.yml + docs.** `Retail.Ml.Trainer` becomes a runnable CLI that **reuses `IForecastService.RefreshAsync` (C2)** — it gains a **`ProjectReference` to `Retail.Api`** (to reach the `RetailDbContext`/entities/`ForecastService` + interceptors; a deliberate tool→app reference) + its own minimal `ServiceCollection` DI wiring (mirroring `RetailDbContextFactory`'s connection-string resolution rather than calling it). So the CLI and the hosted service write rows through the **same** path (no duplication). `ml-train.yml`: a `workflow_dispatch` job that **builds + runs the Trainer's unit-touch / `dotnet build`** of `Retail.Ml.Trainer` (proves it compiles; no Azure, no cron), SHA-pinned actions per `ci.yml`. Plus the new **ADR** (DB-rows/$0 forecast decision — a new ADR, not an ADR-0003 amendment, since 0003 is the anomaly Z-score); DATABASE_DESIGN §5 (`0012`), REQUIREMENTS §9 reconciliation, and a **new scope §18 as-built** section. *Verify:* `dotnet run --project Retail.Ml.Trainer` writes rows against the dev DB; CI green incl. the build-only workflow.
 
 ## 14. Known testing concern — the always-on hosted service
 
@@ -247,6 +247,7 @@ blocker, pivoted to a managed model" is itself a credible engineering-judgment t
 - **Safety stock under intermittent demand** — `1.65·σ·√7` over the zero-inflated daily series uses a normal approximation that mis-fits sparse/lumpy demand (σ deflated by the zeros). It's the spec formula (REQUIREMENTS §9.2) and fine for the demo; a Croston/intermittent-demand method is the honest upgrade — noted, not built.
 - **`DemandForecast` grows append-only** — one row per variant per daily refresh. Bounded at portfolio scale; a retention prune (keep last N per variant) is a trivial follow-on if it ever matters.
 - **The `Fulfilled` series branch is unexercised on demo data** — the status filter is `{Paid, Fulfilled}` (correct), but the seeder writes Paid-only orders, so only the Paid path runs in dev/CI; a fulfilment-flow test would exercise the rest.
+- **`ReorderHint` has no `UNIQUE(ProductVariantId)`** — the upsert is check-then-insert, so under a true multi-writer race (the Trainer CLI racing the daily tick, or multi-instance) two writers could both insert a hint for one variant. Same class as the anomaly half's deferred `UNIQUE(OrderId)` — out of scope at single-instance, durable fix rides the Phase-8 multi-instance move. Hardened defensively: the refresh reads existing hints with a tolerant group-by-`First` (not `ToDictionary`), so a stray duplicate degrades to "update one" instead of throwing and stalling every future refresh.
 
 ## 18. As-built reconciliation (shipped C0–C4)
 
