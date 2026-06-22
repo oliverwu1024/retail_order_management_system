@@ -20,6 +20,8 @@ export const ROLE_SETS = {
   chat: ['StoreManager', 'Administrator'],
   // Order-anomaly Risk Queue — Staff + StoreManager + Administrator (Staff CAN process it), mirrors Anomaly.Manage.
   risk: ['Staff', 'StoreManager', 'Administrator'],
+  // Demand forecast + reorder hints — Staff + StoreManager + Administrator, mirrors Forecast.View.
+  forecast: ['Staff', 'StoreManager', 'Administrator'],
   // Capability (not a sidebar area): who may issue a refund — mirrors Orders.Refund.
   refund: ['StoreManager', 'Administrator'],
 } satisfies Record<string, string[]>

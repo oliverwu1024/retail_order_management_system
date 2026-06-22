@@ -51,6 +51,7 @@ describe('ROLE_SETS capability matrix', () => {
       ROLE_SETS.audit,
       ROLE_SETS.reports,
       ROLE_SETS.risk,
+      ROLE_SETS.forecast,
     ]) {
       expect(set).toEqual(ADMIN_AREA_ROLES)
     }

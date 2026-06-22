@@ -50,3 +50,8 @@ export type ChatSessionPage = Schemas['ChatSessionDtoPagedResult']
 
 export type Anomaly = Schemas['AnomalyDto']
 export type AnomalyPage = Schemas['AnomalyDtoPagedResult']
+
+export type Forecast = Schemas['ForecastDto']
+export type ForecastPage = Schemas['ForecastDtoPagedResult']
+export type ReorderHint = Schemas['ReorderHintDto']
+export type ReorderHintPage = Schemas['ReorderHintDtoPagedResult']

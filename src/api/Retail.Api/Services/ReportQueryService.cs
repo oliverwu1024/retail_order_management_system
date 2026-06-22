@@ -52,6 +52,54 @@ public sealed class ReportQueryService : IReportQueryService
     }
 
     /// <inheritdoc />
+    public async Task<PagedResult<ForecastDto>> GetForecastsAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        // Latest row per variant via a correlated subquery (a naive GroupBy-then-take-latest doesn't
+        // translate). Append-per-refresh means many rows per variant; we want the most recent.
+        IQueryable<DemandForecast> latest = _db.DemandForecasts.AsNoTracking()
+            .Where(f => f.GeneratedAt == _db.DemandForecasts
+                .Where(x => x.ProductVariantId == f.ProductVariantId)
+                .Max(x => x.GeneratedAt));
+        int total = await latest.CountAsync(ct);
+
+        List<ForecastDto> items = await latest
+            .OrderBy(f => f.ProductVariant.Sku)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(f => new ForecastDto(
+                f.ProductVariantId, f.ProductVariant.Sku, f.ProductVariant.Product!.Name,
+                f.ForecastedQty, f.LowerBound, f.UpperBound, f.Confidence, f.GeneratedAt))
+            .ToListAsync(ct);
+
+        return new PagedResult<ForecastDto>(items, total, page, pageSize);
+    }
+
+    /// <inheritdoc />
+    public async Task<PagedResult<ReorderHintDto>> GetReorderHintsAsync(int page, int pageSize, CancellationToken ct)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        IQueryable<ReorderHint> active = _db.ReorderHints.AsNoTracking()
+            .Where(h => !h.Dismissed && h.RecommendedOrderQty > 0);
+        int total = await active.CountAsync(ct);
+
+        List<ReorderHintDto> items = await active
+            .OrderByDescending(h => h.RecommendedOrderQty)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(h => new ReorderHintDto(
+                h.Id, h.ProductVariantId, h.ProductVariant.Sku, h.ProductVariant.Product!.Name,
+                h.RecommendedOrderQty, h.Reasoning, h.GeneratedAt))
+            .ToListAsync(ct);
+
+        return new PagedResult<ReorderHintDto>(items, total, page, pageSize);
+    }
+
+    /// <inheritdoc />
     public async Task<SalesReportDto> GetSalesByDayAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
     {
         List<Order> orders = await _db.Orders.AsNoTracking()

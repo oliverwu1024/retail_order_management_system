@@ -12,6 +12,12 @@ public interface IReportQueryService
     /// </summary>
     Task<PagedResult<AnomalyDto>> GetRiskQueueAsync(int page, int pageSize, CancellationToken ct);
 
+    /// <summary>The LATEST demand forecast per variant (Phase 5B forecasting §8), paged, by SKU.</summary>
+    Task<PagedResult<ForecastDto>> GetForecastsAsync(int page, int pageSize, CancellationToken ct);
+
+    /// <summary>Active reorder hints (not dismissed, qty &gt; 0), ranked by recommended quantity, paged.</summary>
+    Task<PagedResult<ReorderHintDto>> GetReorderHintsAsync(int page, int pageSize, CancellationToken ct);
+
     /// <summary>Sales grouped by day (+ a category breakdown) over <c>[from, to)</c>, counting paid orders.</summary>
     Task<SalesReportDto> GetSalesByDayAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct);
 

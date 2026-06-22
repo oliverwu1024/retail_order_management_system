@@ -20,13 +20,56 @@ public sealed class AnalyticsController : ControllerBase
 {
     private readonly IReportQueryService _reports;
     private readonly IOrderAnomalyService _anomalies;
+    private readonly IForecastService _forecasts;
     private readonly TimeProvider _timeProvider;
 
-    public AnalyticsController(IReportQueryService reports, IOrderAnomalyService anomalies, TimeProvider timeProvider)
+    public AnalyticsController(
+        IReportQueryService reports,
+        IOrderAnomalyService anomalies,
+        IForecastService forecasts,
+        TimeProvider timeProvider)
     {
         _reports = reports;
         _anomalies = anomalies;
+        _forecasts = forecasts;
         _timeProvider = timeProvider;
+    }
+
+    /// <summary>Latest demand forecast per variant (+ 80% band, confidence), paged. Staff+.</summary>
+    [HttpGet("forecast")]
+    [Authorize(Policy = Roles.Policies.ForecastView)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ForecastDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Forecast([FromQuery] ForecastListQuery query, CancellationToken ct)
+    {
+        PagedResult<ForecastDto> result = await _reports.GetForecastsAsync(query.Page, query.PageSize, ct);
+        return Ok(ApiResponse<PagedResult<ForecastDto>>.Ok(result));
+    }
+
+    /// <summary>Active reorder hints, ranked by recommended quantity, paged. Staff+.</summary>
+    [HttpGet("reorder-hints")]
+    [Authorize(Policy = Roles.Policies.ForecastView)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<ReorderHintDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ReorderHints([FromQuery] ForecastListQuery query, CancellationToken ct)
+    {
+        PagedResult<ReorderHintDto> result = await _reports.GetReorderHintsAsync(query.Page, query.PageSize, ct);
+        return Ok(ApiResponse<PagedResult<ReorderHintDto>>.Ok(result));
+    }
+
+    /// <summary>Dismiss a reorder hint (clears it from the active list). Staff+.</summary>
+    [HttpPost("reorder-hints/{id:guid}/dismiss")]
+    [Authorize(Policy = Roles.Policies.ForecastView)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DismissReorderHint(Guid id, CancellationToken ct)
+    {
+        await _forecasts.DismissReorderHintAsync(id, ct);
+        return Ok(ApiResponse<object?>.Ok(null));
     }
 
     /// <summary>Order-anomaly Risk Queue: unacknowledged flagged orders, newest first, paged. Staff+.</summary>
