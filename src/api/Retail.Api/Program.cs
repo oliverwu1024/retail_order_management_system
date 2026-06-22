@@ -421,6 +421,27 @@ try
         builder.Services.AddHostedService<Retail.Api.HostedServices.OrderAnomalyHostedService>();
     }
 
+    // Demand forecasting (Phase 5B). Forecast:Mode selects the pure-C# forecaster (hw default | stub) —
+    // no key, no native runtime (ML.NET SSA was dropped over its MKL/libiomp5 Linux dep; PHASE_5B_FORECAST_SCOPE §4).
+    // The hosted service refreshes daily + immediately on startup, so its registration is gated OFF in
+    // Testing (like the anomaly scan); tests drive IForecastService.RefreshAsync directly.
+    builder.Services.AddOptions<ForecastSettings>()
+        .Bind(builder.Configuration.GetSection(ForecastSettings.SectionName));
+    builder.Services.AddSingleton<Retail.Ml.Forecasting.HoltWintersForecaster>();
+    builder.Services.AddSingleton<Retail.Ml.Forecasting.StubDemandForecaster>();
+    builder.Services.AddSingleton<Retail.Ml.Forecasting.IDemandForecaster>(sp =>
+    {
+        ForecastSettings forecast = sp.GetRequiredService<IOptions<ForecastSettings>>().Value;
+        return forecast.IsStub
+            ? sp.GetRequiredService<Retail.Ml.Forecasting.StubDemandForecaster>()
+            : sp.GetRequiredService<Retail.Ml.Forecasting.HoltWintersForecaster>();
+    });
+    builder.Services.AddScoped<IForecastService, ForecastService>();
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddHostedService<Retail.Api.HostedServices.ForecastRefreshHostedService>();
+    }
+
     // ── AI: Support chatbot (Phase 5A) ────────────────────────────────────────
     // Reuses the ILlmClient seam (stub/Anthropic by Ai:Mode). The multi-turn tool_use/tool_result
     // loop lives in ChatService; the tools are owner-scoped via the existing order read-services, so
