@@ -247,3 +247,32 @@ blocker, pivoted to a managed model" is itself a credible engineering-judgment t
 - **Safety stock under intermittent demand** — `1.65·σ·√7` over the zero-inflated daily series uses a normal approximation that mis-fits sparse/lumpy demand (σ deflated by the zeros). It's the spec formula (REQUIREMENTS §9.2) and fine for the demo; a Croston/intermittent-demand method is the honest upgrade — noted, not built.
 - **`DemandForecast` grows append-only** — one row per variant per daily refresh. Bounded at portfolio scale; a retention prune (keep last N per variant) is a trivial follow-on if it ever matters.
 - **The `Fulfilled` series branch is unexercised on demo data** — the status filter is `{Paid, Fulfilled}` (correct), but the seeder writes Paid-only orders, so only the Paid path runs in dev/CI; a fulfilment-flow test would exercise the rest.
+
+## 18. As-built reconciliation (shipped C0–C4)
+
+Built across five commits on `main` (C0 data model → C1 forecaster → C2 refresh service → C3 API + FE
+→ C4 trainer + docs), each reviewed + CI-green.
+
+- **The headline pivot — ML.NET SSA → pure-C# Holt-Winters (ADR-0012, §4 row 6).** The plan was
+  ML.NET SSA, but `ForecastBySsa` needs Intel MKL (`libiomp5.so`), absent on Linux dev + CI and not in
+  the NuGet redist (`ldd libMklImports.so` → `libiomp5.so => not found`; the planning probe checked
+  compile, not the runtime fit). Pivoted to a dependency-free Holt-Winters model — more hermetic than
+  planned, fully covered (no `[ExcludeFromCodeCoverage]`), and deterministic. The `IDemandForecaster`
+  seam + `ForecastMath` + `DailySeriesBuilder` + stub were unaffected.
+- **The two pre-code review HIGHs hold (F1/F2):** per-day outputs are clamped ≥ 0; the 14-day-total band
+  is quadrature-propagated (`√Σ(Upperᵢ−Forecastᵢ)²`), lower-floored at 0 — not a naive sum of bounds.
+- **Migration `0012_demand_forecast`** (DemandForecast append-per-refresh + ReorderHint upsert-one-per-
+  variant, Dismissed sticks); FK → ProductVariant **Cascade**; new `Forecast.View` policy (Staff+).
+- **In-process is the real runner:** `ForecastService.RefreshAsync` (grouped + zero-filled in memory) +
+  the daily `ForecastRefreshHostedService` (immediate-on-startup, gated OFF in Testing). The
+  `Retail.Ml.Trainer` CLI reuses `RefreshAsync` (verified: writes rows against the dev DB); `ml-train.yml`
+  is a build-only `workflow_dispatch` scaffold.
+- **FE chart deviation from §9:** the stored forecast is a 14-day **total** (not a daily series), so
+  `/admin/forecast` shows a per-variant **bar + upper/lower band lines** across variants (Recharts
+  `ComposedChart`), not a per-variant time-series **line + variant selector**. Same band data, a shape
+  that fits the as-built rows. The reorder-hints table + Dismiss are as specced.
+- **`Confidence`** is a labelled data-sufficiency proxy (`clamp(daysOfHistory/180)`), not a calibrated CI.
+- **Tests (all hermetic, keyless):** `DailySeriesBuilderTests` (3) · `ForecastMathTests` (3) ·
+  `DemandForecasterTests` (5, Holt-Winters deterministic) · `ForecastServiceTests` (5, drive
+  `RefreshAsync`) · `ForecastApiTests` (6, RBAC/list/dismiss) · `ForecastPage` Vitest (2) +
+  the `roleSets.forecast` assertion. Dev-boot proof: "Forecast refresh wrote 7 of 8 active variants".

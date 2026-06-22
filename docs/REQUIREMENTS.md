@@ -303,6 +303,12 @@ Figma UI 链接：*待补充 — 项目自主设计；admin 採用自建 Tailwin
 - 历史 < 30 天 → 跳过该变体，`Confidence=0`
 - UI 显示「Forecast warming up」
 
+> **As-built (Phase 5B 实作偏差，见 `PHASE_5B_FORECAST_SCOPE.md` + ADR-0012):** 模型改用纯 C#
+> **Holt-Winters**（非 ML.NET SSA — SSA 的 Intel MKL/`libiomp5` 原生依赖在 Linux 上缺失）；预测以
+> **DB 行**写入（无 Azure Blob / ModelStore — Phase 8 延后）；冷启动变体**跳过不写行**（以"行不存在"
+> 表示 warming up，而非写 `Confidence=0` 哨兵行）；`ml-train.yml` 为 build-only 脚手架，真正的每日刷新
+> 是进程内 `ForecastRefreshHostedService`。
+
 ---
 
 ### 10. AI 订单异常检测（Phase 5）

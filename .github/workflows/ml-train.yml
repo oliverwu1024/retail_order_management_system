@@ -1,0 +1,39 @@
+name: ML Train (scaffold)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Demand-forecast training pipeline — SCAFFOLD (Phase 5B).
+#
+#  This proves the OFFLINE-retrain shape (a workflow that builds the trainer CLI),
+#  ready for a future phase to wire a real schedule + target. It deliberately
+#  does NOT:
+#    - run on a cron (manual workflow_dispatch only),
+#    - touch Azure / a live database / Blob storage.
+#
+#  The REAL daily forecast is the in-process ForecastRefreshHostedService writing
+#  rows to SQL (PHASE_5B_FORECAST_SCOPE §3.1). Forecasting is pure-C# Holt-Winters
+#  (no ML.NET / native runtime — ADR-0012), so there is nothing to train+publish
+#  to Blob; this workflow exists to demonstrate the pipeline shape and to keep the
+#  Retail.Ml.Trainer CLI compiling.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+
+# Least privilege: build only, no deployment secrets.
+permissions:
+  contents: read
+
+jobs:
+  build-trainer:
+    name: Build forecast trainer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Retail.Ml.Trainer
+        run: dotnet build src/ml/Retail.Ml.Trainer/Retail.Ml.Trainer.csproj -c Release

@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- Reuses Retail.Api's RetailDbContext + ForecastService + Holt-Winters forecaster so the CLI and
+         the in-process hosted service write rows through the SAME path (PHASE_5B_FORECAST_SCOPE §3.1).
+         Retail.Api transitively brings EF Core + the DI/logging/options packages. -->
+    <ProjectReference Include="..\..\api\Retail.Api\Retail.Api.csproj" />
     <ProjectReference Include="..\Retail.Ml\Retail.Ml.csproj" />
   </ItemGroup>
 
