@@ -131,6 +131,13 @@ public class RetailDbContext : IdentityDbContext<ApplicationUser>
     /// <summary>System-generated risk flags on orders (one per flagged order). Gates Mark-Shipped until acknowledged.</summary>
     public DbSet<OrderAnomaly> OrderAnomalies => Set<OrderAnomaly>();
 
+    // ── Demand forecasting (Phase 5B) ────────────────────────────────────────
+    /// <summary>Per-variant SSA demand forecasts (appended per daily refresh; latest read by GeneratedAt).</summary>
+    public DbSet<DemandForecast> DemandForecasts => Set<DemandForecast>();
+
+    /// <summary>Per-variant restock recommendations (one upserted row per variant; Dismissed sticks).</summary>
+    public DbSet<ReorderHint> ReorderHints => Set<ReorderHint>();
+
     /// <summary>
     /// EF Core's hook for schema configuration via the Fluent API. Called
     /// once at model-build time (effectively at startup), then cached.

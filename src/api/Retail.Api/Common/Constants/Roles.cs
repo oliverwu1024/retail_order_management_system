@@ -106,6 +106,13 @@ public static class Roles
         /// </summary>
         public const string AnomalyManage = "Anomaly.Manage";
 
+        /// <summary>
+        /// View demand forecasts + reorder hints and dismiss a hint. Staff + StoreManager +
+        /// Administrator (Staff INCLUDED — REQUIREMENTS §9 matrix: 查看预测和补货建议 / 关闭补货提示),
+        /// mirroring <see cref="AnomalyManage"/>. Phase 5B.
+        /// </summary>
+        public const string ForecastView = "Forecast.View";
+
         /// <summary>Create/list Staff accounts. StoreManager + Administrator.</summary>
         public const string UsersManageStaff = "Users.ManageStaff";
 
